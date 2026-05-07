@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { ArrowRight, Zap, Shield, BarChart3, Layers, TrendingUp, ChevronRight } from 'lucide-react'
 import { SwapCard } from '@/components/swap/SwapCard'

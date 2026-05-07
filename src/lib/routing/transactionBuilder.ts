@@ -8,7 +8,7 @@
  *    through the appropriate pool, then merge the output coins and transfer to
  *    the recipient.
  *
- * Slippage is applied to the final minAmountOut check only — intermediate hops
+ * Slippage is applied to the final minAmountOut check only - intermediate hops
  * are unconstrained so that on-chain price movements during the PTB do not
  * cause unnecessary reverts.
  *
@@ -18,7 +18,7 @@
  *   move call to the shared Transaction.  In a complete SDK integration the
  *   caller would capture `txb.moveCall(...)` return values and thread them as
  *   `txb.object(result)` arguments.  The scaffolding below represents this
- *   pattern — replace the `/* swap result */` comments with real result
+ *   pattern - replace the swap-result comments with real result
  *   references once each DEX adapter's exact return types are confirmed.
  */
 
