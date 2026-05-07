@@ -2,7 +2,26 @@
 
 import { useSuiClient } from '@mysten/dapp-kit'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import type { SuiClient } from '@mysten/sui/client'
+
+// Minimal cursor shape used by Sui's queryEvents API
+interface SuiEventId {
+  txDigest: string
+  eventSeq: string
+}
+
+// Narrow interface so we don't depend on the exact SDK type for SuiClient
+interface SuiQueryClient {
+  queryEvents(params: {
+    query:   { MoveEventType: string }
+    cursor?: SuiEventId | null
+    limit?:  number
+    order?:  'ascending' | 'descending'
+  }): Promise<{
+    data:        Array<{ parsedJson?: unknown; id?: SuiEventId; timestampMs?: string | null }>
+    nextCursor:  SuiEventId | null | undefined
+    hasNextPage: boolean
+  }>
+}
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -55,7 +74,7 @@ interface RawSwapEventFields {
 }
 
 function parseRawEvent(
-  raw: { parsedJson?: unknown; id?: { txDigest?: string }; timestampMs?: string | null },
+  raw: { parsedJson?: unknown; id?: SuiEventId; timestampMs?: string | null },
 ): SwapEvent | null {
   try {
     const fields = raw.parsedJson as RawSwapEventFields
@@ -89,7 +108,7 @@ function generateMockSwaps(count: number): SwapEvent[] {
     const outIdx = (i + 1 + Math.floor(i / tokens.length)) % tokens.length
     return {
       digest:      `0x${'0'.repeat(63)}${(i + 1).toString(16)}`,
-      user:        `0x${(BigInt('0xdeadbeef') + BigInt(i)).toString(16).padStart(40, '0')}`,
+      user:        `0x${'0'.repeat(32)}${((0xdeadbeef + i) >>> 0).toString(16).padStart(8, '0')}`,
       coinInType:  tokens[inIdx],
       coinOutType: tokens[outIdx],
       amountIn:    (i + 1) * 1_000_000_000,
@@ -130,20 +149,21 @@ export function useRecentSwaps(limit = 10): UseRecentSwapsResult {
   const [error, setError]     = useState<string | null>(null)
   const [isMockData, setIsMockData] = useState(false)
 
-  const cursorRef    = useRef<string | null>(null)
-  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Store the full EventId object — the cursor param requires the same shape
+  const cursorRef   = useRef<SuiEventId | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchEvents = useCallback(
-    async (suiClient: SuiClient, isInitial: boolean) => {
+    async (suiClient: SuiQueryClient, isInitial: boolean) => {
       if (isInitial) setLoading(true)
       setError(null)
 
       try {
         const page = await suiClient.queryEvents({
-          query:           { MoveEventType: OMNIWEAVE_SWAP_EVENT_TYPE },
-          cursor:          cursorRef.current as Parameters<typeof suiClient.queryEvents>[0]['cursor'],
+          query:  { MoveEventType: OMNIWEAVE_SWAP_EVENT_TYPE },
+          cursor: cursorRef.current,
           limit,
-          order:           'descending',
+          order:  'descending',
         })
 
         const parsed = page.data
@@ -166,7 +186,7 @@ export function useRecentSwaps(limit = 10): UseRecentSwapsResult {
               return [...fresh, ...prev].slice(0, limit)
             })
           }
-          if (page.nextCursor) cursorRef.current = page.nextCursor as string
+          if (page.nextCursor) cursorRef.current = page.nextCursor
         }
       } catch (err) {
         if (isInitial) {

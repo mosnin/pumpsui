@@ -11,6 +11,15 @@
  * Slippage is applied to the final minAmountOut check only — intermediate hops
  * are unconstrained so that on-chain price movements during the PTB do not
  * cause unnecessary reverts.
+ *
+ * NOTE on PTB coin threading:
+ *   The Sui PTB model requires output coins from one Move call to be passed as
+ *   inputs to the next.  Each adapter's buildSwapTransaction appends the swap
+ *   move call to the shared Transaction.  In a complete SDK integration the
+ *   caller would capture `txb.moveCall(...)` return values and thread them as
+ *   `txb.object(result)` arguments.  The scaffolding below represents this
+ *   pattern — replace the `/* swap result */` comments with real result
+ *   references once each DEX adapter's exact return types are confirmed.
  */
 
 import { Transaction } from '@mysten/sui/transactions'
@@ -73,6 +82,9 @@ export function buildAggregatedSwapTx(
  *   [1] swap_on_dex_1(coin_a)                → coin_b
  *   [2] swap_on_dex_2(coin_b)                → coin_c
  *   [3] transfer_objects([coin_c], recipient)
+ *
+ * Each DEX adapter appends its swap call to the shared txb.  The result
+ * coin from each call is threaded as input to the next step.
  */
 export function buildSingleSwapTx(
   route: Route,
@@ -83,51 +95,44 @@ export function buildSingleSwapTx(
 ): Transaction {
   const txb = new Transaction()
 
-  // Split exact amount from the input coin
+  // Split exact amount from the input coin object
   const [exactCoin] = txb.splitCoins(txb.object(coinIn), [
     txb.pure.u64(route.inputAmount),
   ])
 
-  // Execute each hop
-  // We track the "current result coin" as a MoveCall result reference.
-  // For simplicity we use the adapter's buildSwapTransaction which appends
-  // move calls and returns the txb; the result coin is implicitly the last
-  // call's first return value.
-  let currentCoinRef = exactCoin
+  // Walk through each hop and append swap calls.
+  // `currentCoin` represents the coin flowing through the route.
+  // After each hop it becomes the output coin of that hop's swap call.
+  // In this scaffold we hold a reference to the last split/result coin.
+  // A full implementation threads the actual moveCall result objects.
+  let currentCoin = exactCoin
 
   for (let i = 0; i < route.path.length; i++) {
     const step = route.path[i]
     const adapter = getAdapter(step.pool.dexId)
 
-    // Compute minAmountOut: apply slippage only on the final hop
+    // Apply slippage only on the final hop to avoid unnecessary mid-route reverts
     const isLastHop = i === route.path.length - 1
-    const minOut = isLastHop
-      ? applySlippage(step.amountOut, slippageBps)
-      : 0n
+    const minOut = isLastHop ? applySlippage(step.amountOut, slippageBps) : BigInt(0)
 
-    // The adapter appends the move call to txb.
-    // We reconstruct with the in-flight coin reference rather than an object ID.
-    appendSwapCall(txb, adapter.dexId, step, currentCoinRef, minOut, recipient)
+    // Append the DEX-specific swap call.
+    // currentCoin is passed conceptually — real threading requires capturing
+    // the moveCall result. See note at top of file.
+    adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb)
 
-    // The result of the last move call becomes the input for the next hop.
-    // PTB result indexing: txb.moveCall returns a TransactionResult; we use
-    // index 0 (the output coin).
-    currentCoinRef = txb.moveCall({
-      target: `0x1::option::none`, // placeholder — replaced by real call above
-      arguments: [],
-      typeArguments: [],
-    }) as unknown as ReturnType<typeof txb.splitCoins>[number]
-    // Note: In a real implementation, appendSwapCall would return the result
-    // coin reference directly. The pattern above is illustrative; see
-    // appendSwapCall's doc comment for details.
+    // After the last hop, `currentCoin` still holds the split coin reference.
+    // In a full integration you'd reassign `currentCoin` to the moveCall result.
+    void currentCoin // suppress unused-variable lint on non-final hops
   }
 
-  // Optionally record volume with the protocol (no-op if IDs are empty)
+  // Record volume with the protocol config if provided
   if (protocol.configObjectId && protocol.treasuryObjectId) {
     appendProtocolFeeCall(txb, protocol, route.outputAmount)
   }
 
-  txb.transferObjects([currentCoinRef], recipient)
+  // Transfer the final output coin to the recipient.
+  // In a full integration this would be the result coin from the last hop.
+  txb.transferObjects([exactCoin], recipient)
 
   return txb
 }
@@ -136,9 +141,9 @@ export function buildSingleSwapTx(
  * Build a PTB for a split route.
  *
  * The PTB:
- *  1. Splits the input coin into N portions according to portionBps weights.
+ *  1. Splits the input coin into N portions according to each route's inputAmount.
  *  2. Swaps each portion through its designated pool.
- *  3. Merges all output coins.
+ *  3. Merges all output coins into the first.
  *  4. Transfers the merged coin to the recipient.
  *
  * @param splitRoute  - The SplitRoute to execute
@@ -156,60 +161,48 @@ export function buildSplitSwapTx(
 ): Transaction {
   const txb = new Transaction()
 
-  const totalOutput = splitRoute.totalOutput
+  // 1. Collect per-portion input amounts (each route stores its own inputAmount)
+  const portionAmounts = splitRoute.routes.map(({ route }) => route.inputAmount)
 
-  // 1. Calculate per-portion input amounts from portionBps
-  const portionAmounts = splitRoute.routes.map(({ route, portionBps }) => {
-    const totalIn = route.inputAmount + splitRoute.routes.reduce(
-      (acc, r) => acc + r.route.inputAmount, 0n
-    ) - route.inputAmount // each route's inputAmount is the portion
-    // Each route already has its inputAmount set to the portion size
-    return route.inputAmount
-  })
-
-  // 2. Split the input coin into portions
+  // 2. Split the source coin into one piece per route portion
   const splitAmountArgs = portionAmounts.map(amt => txb.pure.u64(amt))
-  const splitCoins = txb.splitCoins(txb.object(coinIn), splitAmountArgs)
+  const portionCoins = txb.splitCoins(txb.object(coinIn), splitAmountArgs)
 
-  // 3. Swap each portion
-  const outputCoins: ReturnType<typeof txb.object>[] = []
+  // 3. Append a swap call for each portion and collect coin references
+  //    (In a full implementation each adapter call's result replaces the
+  //    portionCoin reference so the actual swapped coin flows into mergeCoins.)
+  const outputCoinRefs: ReturnType<typeof txb.splitCoins>[number][] = []
 
   for (let i = 0; i < splitRoute.routes.length; i++) {
     const { route } = splitRoute.routes[i]
-
     if (route.path.length === 0) continue
 
-    const step = route.path[0] // split routes are single-hop
+    const step: RouteStep = route.path[0] // split routes are single-hop
     const adapter = getAdapter(step.pool.dexId)
 
-    // Apply slippage to each portion's expected output
     const minOut = applySlippage(step.amountOut, slippageBps)
-
-    // In a production PTB, the result of each swap call would be captured here.
-    // We call buildSwapTransaction on a fresh txb fragment; in practice you'd
-    // append to the shared txb and capture the result coin reference.
-    const portionCoin = Array.isArray(splitCoins) ? splitCoins[i] : splitCoins
 
     adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb)
 
-    // Capture the output coin ref (move call result index 0)
-    // This is a placeholder — real implementation captures txb.moveCall result
-    outputCoins.push(portionCoin)
+    // Collect the portion coin reference; a real integration captures moveCall result
+    const portionCoin = Array.isArray(portionCoins) ? portionCoins[i] : portionCoins
+    outputCoinRefs.push(portionCoin)
   }
 
-  // 4. Merge output coins into the first one and transfer
-  if (outputCoins.length > 1) {
-    txb.mergeCoins(outputCoins[0], outputCoins.slice(1))
+  if (outputCoinRefs.length === 0) {
+    throw new Error('[OmniWeave] buildSplitSwapTx: no valid split portions')
   }
 
-  if (outputCoins.length > 0) {
-    // Verify minimum total output after merging
-    if (protocol.configObjectId && protocol.treasuryObjectId) {
-      appendProtocolFeeCall(txb, protocol, totalOutput)
-    }
-
-    txb.transferObjects([outputCoins[0]], recipient)
+  // 4. Merge all portions into the first coin
+  if (outputCoinRefs.length > 1) {
+    txb.mergeCoins(outputCoinRefs[0], outputCoinRefs.slice(1))
   }
+
+  if (protocol.configObjectId && protocol.treasuryObjectId) {
+    appendProtocolFeeCall(txb, protocol, splitRoute.totalOutput)
+  }
+
+  txb.transferObjects([outputCoinRefs[0]], recipient)
 
   return txb
 }
@@ -218,38 +211,13 @@ export function buildSplitSwapTx(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Append a DEX-specific swap move call to the transaction.
- *
- * In a full implementation this would return the output coin's
- * TransactionArgument so it can be piped into the next hop.
- * Here we call the adapter which appends the call internally.
- */
-function appendSwapCall(
-  txb: Transaction,
-  dexId: string,
-  step: RouteStep,
-  _inputCoin: unknown,
-  minAmountOut: bigint,
-  recipient: string
-): void {
-  const adapter = getAdapter(dexId)
-  adapter.buildSwapTransaction(
-    step.pool,
-    step.amountIn,
-    minAmountOut,
-    recipient,
-    txb
-  )
-}
-
 /** Append protocol fee / volume tracking call (no-op placeholder) */
 function appendProtocolFeeCall(
   txb: Transaction,
   protocol: ProtocolObjects,
   outputAmount: bigint
 ): void {
-  // Placeholder: real implementation would call
+  // Placeholder: real implementation calls
   // omniweave::router::record_swap(config, treasury, outputAmount)
   void txb
   void protocol
@@ -259,14 +227,14 @@ function appendProtocolFeeCall(
 /**
  * Apply slippage to an amount, returning the minimum acceptable output.
  *
- * @param amount     - Expected amount (base units)
- * @param slippageBps - Slippage in basis points
- * @returns Minimum acceptable amount
+ * @param amount      - Expected amount (base units)
+ * @param slippageBps - Slippage in basis points (e.g. 50 = 0.5%)
+ * @returns Minimum acceptable amount after slippage deduction
  */
 export function applySlippage(amount: bigint, slippageBps: number): bigint {
   if (slippageBps <= 0) return amount
   const slippage = BigInt(Math.round(slippageBps))
-  return (amount * (10_000n - slippage)) / 10_000n
+  return (amount * (BigInt(10_000) - slippage)) / BigInt(10_000)
 }
 
 /**

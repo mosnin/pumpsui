@@ -12,7 +12,7 @@ import SlippageSettings from './SlippageSettings'
 
 type ModalTarget = 'in' | 'out' | null
 
-export default function SwapCard() {
+export function SwapCard() {
   const swap = useSwap()
   const [modalTarget, setModalTarget] = useState<ModalTarget>(null)
   const [flipping, setFlipping] = useState(false)
@@ -311,3 +311,6 @@ export default function SwapCard() {
     </>
   )
 }
+
+// Default export for `import SwapCard from './SwapCard'` compatibility
+export default SwapCard

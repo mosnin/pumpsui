@@ -14,7 +14,8 @@
 
   /* Font variables injected by Next.js font loader */
   --font-sans: var(--font-inter, ui-sans-serif, system-ui, sans-serif);
-  --font-display: var(--font-space, var(--font-inter, ui-sans-serif, system-ui, sans-serif));
+  /* layout.tsx injects --font-space-grotesk; support both variable names */
+  --font-display: var(--font-space-grotesk, var(--font-space, var(--font-inter, ui-sans-serif, system-ui, sans-serif)));
 }
 
 html, body {

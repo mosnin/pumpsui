@@ -1,21 +1,16 @@
 'use client'
 
 import { SuiClientProvider, WalletProvider, createNetworkConfig } from '@mysten/dapp-kit'
-import { getFullnodeUrl } from '@mysten/sui/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-// Gracefully import dapp-kit CSS — if the file doesn't exist the import is a no-op at runtime
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('@mysten/dapp-kit/dist/index.css')
-} catch {
-  // CSS not available in this build — continue without it
-}
+// Hardcoded Sui fullnode URLs (avoids @mysten/sui/client version mismatch)
+const SUI_MAINNET_URL = 'https://fullnode.mainnet.sui.io:443'
+const SUI_TESTNET_URL = 'https://fullnode.testnet.sui.io:443'
 
 const { networkConfig } = createNetworkConfig({
-  mainnet: { url: getFullnodeUrl('mainnet') },
-  testnet: { url: getFullnodeUrl('testnet') },
+  mainnet: { url: SUI_MAINNET_URL },
+  testnet: { url: SUI_TESTNET_URL },
 })
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
