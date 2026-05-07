@@ -204,16 +204,18 @@ export function useRecentSwaps(limit = 10): UseRecentSwapsResult {
 
   const refresh = useCallback(() => {
     cursorRef.current = null
-    fetchEvents(client, true)
+    // Cast: useSuiClient() returns SuiJsonRpcClient which satisfies SuiQueryClient
+    fetchEvents(client as unknown as SuiQueryClient, true)
   }, [client, fetchEvents])
 
   useEffect(() => {
+    const typedClient = client as unknown as SuiQueryClient
     // Initial load
-    fetchEvents(client, true)
+    fetchEvents(typedClient, true)
 
     // Poll for new events
     intervalRef.current = setInterval(
-      () => fetchEvents(client, false),
+      () => fetchEvents(typedClient, false),
       POLL_INTERVAL_MS,
     )
 
