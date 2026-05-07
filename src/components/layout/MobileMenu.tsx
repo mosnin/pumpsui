@@ -13,6 +13,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Swap', href: '/swap' },
+  { label: 'Bridge', href: '/bridge' },
   { label: 'Pools', href: '/pools' },
   { label: 'Analytics', href: '/analytics' },
   { label: 'Portfolio', href: '/portfolio' },
@@ -189,6 +190,11 @@ function NavIcon({ label, active }: { label: string; active: boolean }) {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
         <path d="M7 16V4m0 0L3 8m4-4l4 4" />
         <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
+      </svg>
+    ),
+    Bridge: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
       </svg>
     ),
     Pools: (
