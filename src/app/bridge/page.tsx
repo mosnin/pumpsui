@@ -170,7 +170,7 @@ function QuoteRow({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function BridgePage() {
-  const [fromChainId, setFromChainId] = useState(CHAIN_IDS.ETHEREUM)
+  const [fromChainId, setFromChainId] = useState<number>(CHAIN_IDS.ETHEREUM)
   const [amount, setAmount] = useState('')
   const [selectedBridgeId, setSelectedBridgeId] = useState<string | null>(null)
   const [quotes, setQuotes] = useState<BridgeQuote[]>([])
