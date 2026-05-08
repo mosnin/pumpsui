@@ -115,7 +115,7 @@ export default function Home() {
 
         {/* Headline */}
         <h1
-          className="text-6xl md:text-8xl font-bold mb-6 tracking-tight"
+          className="text-4xl sm:text-6xl md:text-8xl font-bold mb-6 tracking-tight"
           style={{
             fontFamily: 'var(--font-display)',
             lineHeight: 1.05,
@@ -128,7 +128,7 @@ export default function Home() {
         </h1>
 
         <p
-          className="text-xl max-w-2xl mx-auto mb-12 leading-relaxed"
+          className="text-base sm:text-xl max-w-2xl mx-auto mb-12 leading-relaxed"
           style={{ color: '#94A3B8' }}
         >
           OmniWeave aggregates liquidity from every major Sui DEX to find you
@@ -137,7 +137,7 @@ export default function Home() {
         </p>
 
         {/* Stats bar */}
-        <div className="flex justify-center gap-8 md:gap-16 mb-16 flex-wrap">
+        <div className="flex justify-center gap-6 md:gap-16 mb-16 flex-wrap">
           {STATS.map((stat) => (
             <div key={stat.label} className="text-center">
               <div className="text-3xl font-bold gradient-text">{stat.value}</div>
@@ -325,7 +325,7 @@ export default function Home() {
       {/* ── CTA Banner ── */}
       <section className="py-28 px-4">
         <div
-          className="max-w-3xl mx-auto rounded-3xl p-12 text-center relative overflow-hidden"
+          className="max-w-3xl mx-auto rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden"
           style={{
             background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(6,182,212,0.1) 100%)',
             border: '1px solid rgba(99,102,241,0.25)',

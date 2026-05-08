@@ -468,7 +468,7 @@ export class AftermathAdapter implements DexAdapter {
 // ---------------------------------------------------------------------------
 
 /**
- * FlowX is a Uniswap V2-style AMM on Sui.
+ * FlowX is a constant-product AMM on Sui.
  */
 export class FlowXAdapter implements DexAdapter {
   readonly dexId = DexId.FLOWX

@@ -18,15 +18,29 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'OmniWeave | The Ultimate Sui Liquidity Layer',
-  description:
-    'Trade any token on Sui at the best prices. OmniWeave aggregates liquidity from Cetus, Turbos, DeepBook, and more.',
-  keywords: 'Sui, DEX, aggregator, DeFi, swap, Cetus, Turbos, DeepBook',
-  openGraph: {
-    title: 'OmniWeave | The Ultimate Sui Liquidity Layer',
-    description: 'Trade any token on Sui at the best prices.',
-    type: 'website',
+  title: {
+    default: 'OmniWeave | Best DEX Aggregator on Sui',
+    template: '%s | OmniWeave',
   },
+  description: 'Trade any token on Sui at the best price. OmniWeave aggregates liquidity from Cetus, Turbos, DeepBook, Aftermath and more. Best rates, MEV protection, multi-hop routing.',
+  keywords: ['Sui', 'DEX', 'aggregator', 'DeFi', 'swap', 'Cetus', 'Turbos', 'DeepBook', 'Aftermath', 'liquidity', 'OmniWeave'],
+  authors: [{ name: 'OmniWeave' }],
+  openGraph: {
+    title: 'OmniWeave | Best DEX Aggregator on Sui',
+    description: 'Trade any token on Sui at the best price.',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'OmniWeave | Best DEX Aggregator on Sui',
+    description: 'Trade any token on Sui at the best price.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -15,10 +15,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Swap', href: '/swap' },
+  { label: 'Limit', href: '/limit' },
   { label: 'Bridge', href: '/bridge' },
   { label: 'Pools', href: '/pools' },
   { label: 'Analytics', href: '/analytics' },
   { label: 'Portfolio', href: '/portfolio' },
+  { label: 'Leaderboard', href: '/leaderboard' },
+  { label: 'Referral', href: '/referral' },
 ]
 
 // ─── OmniWeave SVG Logo ───────────────────────────────────────────────────────
@@ -113,7 +116,7 @@ function HamburgerButton({ open, onClick }: { open: boolean; onClick: () => void
       onClick={onClick}
       aria-label={open ? 'Close menu' : 'Open menu'}
       aria-expanded={open}
-      className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/8 hover:text-slate-200 lg:hidden"
+      className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/8 hover:text-slate-200 lg:hidden"
     >
       <svg
         width="20"

@@ -3,6 +3,8 @@
 import { SuiClientProvider, WalletProvider, createNetworkConfig } from '@mysten/dapp-kit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
+import { ToastProvider } from '@/components/ui/Toast'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 // Hardcoded Sui fullnode URLs (avoids @mysten/sui/client version mismatch)
 const SUI_MAINNET_URL = 'https://fullnode.mainnet.sui.io:443'
@@ -27,10 +29,14 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networkConfig} defaultNetwork="mainnet">
-        <WalletProvider autoConnect>{children}</WalletProvider>
-      </SuiClientProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <SuiClientProvider networks={networkConfig} defaultNetwork="mainnet">
+          <WalletProvider autoConnect>
+            <ToastProvider>{children}</ToastProvider>
+          </WalletProvider>
+        </SuiClientProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   )
 }

@@ -1,10 +1,20 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { ArrowDown, Clock, Shield, Zap, ChevronDown, ArrowLeftRight, Info } from 'lucide-react'
+import Link from 'next/link'
+import {
+  ArrowDown, Clock, Shield, Zap, ChevronDown, ArrowLeftRight, Info,
+  History, Flame, Star, TrendingUp,
+} from 'lucide-react'
 import { CHAIN_IDS, SUPPORTED_CHAINS, BRIDGE_TOKENS } from '@/lib/bridges/types'
 import type { BridgeQuote } from '@/lib/bridges/types'
 import { getAllBridgeQuotes, formatEstimatedTime, formatBridgeFee } from '@/lib/bridges'
+import BridgeTransactionTracker, {
+  loadBridgeTxs,
+  updateBridgeTx,
+  useWormholeStatusPoll,
+} from '@/components/bridge/BridgeTransactionTracker'
+import type { BridgeTxRecord } from '@/components/bridge/BridgeTransactionTracker'
 
 // ─── Chain icon (uses emoji fallback, robust) ─────────────────────────────────
 
@@ -108,6 +118,9 @@ function QuoteRow({
     ? ((Number(quote.toAmount) / Number(quote.fromAmount)) * 100).toFixed(2)
     : '0.00'
 
+  const isBestRate = rank === 0
+  const isFastest  = rank === 0  // could be recalculated separately
+
   return (
     <button
       onClick={onSelect}
@@ -125,7 +138,7 @@ function QuoteRow({
       }}
     >
       {/* Best badge */}
-      {rank === 0 && (
+      {isBestRate && (
         <span
           className="absolute -top-2.5 left-4 text-xs font-semibold px-2.5 py-0.5 rounded-full"
           style={{
@@ -151,10 +164,20 @@ function QuoteRow({
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-white">{quote.bridgeName}</div>
         <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1 flex-wrap">
+          {/* Estimated arrival */}
           <Clock className="w-3 h-3 flex-shrink-0" />
-          {formatEstimatedTime(quote.estimatedTime)}
+          <span style={{ color: quote.estimatedTime < 180 ? '#10B981' : '#94A3B8' }}>
+            {formatEstimatedTime(quote.estimatedTime)}
+          </span>
           <span className="mx-1 text-slate-700">·</span>
           fee {formatBridgeFee(quote.totalCostUSD)}
+          {/* Gas cost on destination */}
+          {quote.gasCostUSD > 0 && (
+            <>
+              <span className="mx-1 text-slate-700">·</span>
+              <span className="text-slate-600">+{formatBridgeFee(quote.gasCostUSD)} gas</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -167,6 +190,33 @@ function QuoteRow({
   )
 }
 
+// ─── Best route recommendation pill ──────────────────────────────────────────
+
+function BestRoutePill({ quote }: { quote: BridgeQuote }) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2 rounded-xl"
+      style={{
+        background: `${quote.bridgeColor}10`,
+        border: `1px solid ${quote.bridgeColor}25`,
+      }}
+    >
+      <Star className="w-3 h-3 flex-shrink-0" style={{ color: quote.bridgeColor }} />
+      <span className="text-xs text-slate-400">
+        Best route:
+      </span>
+      <span className="text-xs font-semibold" style={{ color: quote.bridgeColor }}>
+        {quote.bridgeName}
+      </span>
+      <span className="text-slate-700 text-xs">·</span>
+      <span className="text-xs text-slate-400">
+        arrives in {formatEstimatedTime(quote.estimatedTime)}
+      </span>
+      <TrendingUp className="w-3 h-3 ml-auto flex-shrink-0 text-emerald-400" />
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function BridgePage() {
@@ -175,6 +225,25 @@ export default function BridgePage() {
   const [selectedBridgeId, setSelectedBridgeId] = useState<string | null>(null)
   const [quotes, setQuotes] = useState<BridgeQuote[]>([])
   const [loadingQuotes, setLoadingQuotes] = useState(false)
+
+  // Recent transactions from localStorage
+  const [recentTxs, setRecentTxs] = useState<BridgeTxRecord[]>([])
+  const [txsHydrated, setTxsHydrated] = useState(false)
+
+  useEffect(() => {
+    setTxsHydrated(true)
+    // Newest first; show only the 3 most recent
+    const all = loadBridgeTxs()
+    setRecentTxs(all.slice().reverse().slice(0, 3))
+  }, [])
+
+  // Poll Wormhole scan for in-progress transactions
+  const handleTxUpdate = useCallback((id: string, patch: Partial<BridgeTxRecord>) => {
+    updateBridgeTx(id, patch)
+    setRecentTxs((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+  }, [])
+
+  useWormholeStatusPoll(recentTxs, handleTxUpdate)
 
   // Source tokens for selected chain
   const sourceTokens = BRIDGE_TOKENS.filter((t) => t.chainId === fromChainId)
@@ -225,6 +294,10 @@ export default function BridgePage() {
     if (!selectedQuote) return
     window.open(selectedQuote.url, '_blank', 'noopener,noreferrer')
   }
+
+  const activeTxCount = recentTxs.filter(
+    (t) => t.status !== 'complete' && t.status !== 'failed'
+  ).length
 
   return (
     <div className="relative min-h-screen py-16 px-4 overflow-hidden">
@@ -389,6 +462,11 @@ export default function BridgePage() {
                   </div>
                 </div>
 
+                {/* Best route recommendation */}
+                {selectedQuote && amount && parseFloat(amount) > 0 && (
+                  <BestRoutePill quote={selectedQuote} />
+                )}
+
                 {/* Best rate summary */}
                 {selectedQuote && amount && parseFloat(amount) > 0 && (
                   <div
@@ -411,12 +489,27 @@ export default function BridgePage() {
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
+                      <span className="text-slate-500">Bridge fee</span>
+                      <span className="text-slate-300">{formatBridgeFee(selectedQuote.feeUSD)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500">Gas on Sui (claim)</span>
+                      <span className="text-slate-300">
+                        {selectedQuote.gasCostUSD > 0 ? formatBridgeFee(selectedQuote.gasCostUSD) : 'None'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs pt-1" style={{ borderTop: '1px solid rgba(16,185,129,0.15)' }}>
                       <span className="text-slate-500">Total cost</span>
                       <span className="text-slate-300">{formatBridgeFee(selectedQuote.totalCostUSD)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">ETA</span>
-                      <span className="text-slate-300">{formatEstimatedTime(selectedQuote.estimatedTime)}</span>
+                      <span className="text-slate-500">Arrives in</span>
+                      <span
+                        className="font-semibold"
+                        style={{ color: selectedQuote.estimatedTime < 180 ? '#10B981' : '#94A3B8' }}
+                      >
+                        {formatEstimatedTime(selectedQuote.estimatedTime)}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -456,7 +549,7 @@ export default function BridgePage() {
                     ? 'Enter an amount'
                     : !selectedQuote
                     ? 'No routes found'
-                    : `Bridge via ${selectedQuote.bridgeName}`}
+                    : `Bridge via ${selectedQuote.bridgeName} · ${formatEstimatedTime(selectedQuote.estimatedTime)}`}
                 </button>
               </div>
             </div>
@@ -485,6 +578,40 @@ export default function BridgePage() {
                     onSelect={() => setSelectedBridgeId(quote.bridgeId)}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* Recent transactions section */}
+            {txsHydrated && recentTxs.length > 0 && (
+              <div className="glass-card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="w-3.5 h-3.5 text-slate-500" />
+                    <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Recent Transactions
+                    </h3>
+                    {activeTxCount > 0 && (
+                      <span
+                        className="text-xs font-medium px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8' }}
+                      >
+                        {activeTxCount} active
+                      </span>
+                    )}
+                  </div>
+                  <Link
+                    href="/bridge/history"
+                    className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >
+                    View all →
+                  </Link>
+                </div>
+
+                <BridgeTransactionTracker
+                  transactions={recentTxs}
+                  onDismiss={(id) => setRecentTxs((prev) => prev.filter((t) => t.id !== id))}
+                  activeOnly={false}
+                />
               </div>
             )}
 
@@ -535,6 +662,14 @@ export default function BridgePage() {
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{b.desc}</p>
+                    </div>
+                    {/* Estimated time badge */}
+                    <div
+                      className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}
+                    >
+                      <Clock className="w-3 h-3" />
+                      {b.eta}
                     </div>
                   </div>
                 ))}
@@ -597,6 +732,28 @@ export default function BridgePage() {
                 </div>
               </div>
             </div>
+
+            {/* History shortcut */}
+            <Link
+              href="/bridge/history"
+              className="glass-card p-4 flex items-center gap-3 transition-all hover:border-indigo-500/30 block"
+              style={{ textDecoration: 'none' }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}
+              >
+                <History className="w-4 h-4 text-indigo-400" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-200">Bridge History</div>
+                <div className="text-xs text-slate-500 mt-0.5">Track past & in-progress transfers</div>
+              </div>
+              <svg className="ml-auto w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </Link>
           </div>
         </div>
       </div>
@@ -607,12 +764,12 @@ export default function BridgePage() {
 // ─── Static content ────────────────────────────────────────────────────────────
 
 const BRIDGE_INFO = [
-  { id: 'wormhole',   name: 'Wormhole',       color: '#7C3AED', desc: 'EVM + Solana → Sui · CCTP USDC · 1-15 min' },
-  { id: 'layerzero',  name: 'LayerZero',       color: '#3B82F6', desc: 'EVM → Sui via Stargate V3 OFT · 1-5 min' },
-  { id: 'celer',      name: 'Celer cBridge',   color: '#00D395', desc: 'EVM → Sui lock-and-mint · ETH, USDC, WBTC' },
-  { id: 'mayan',      name: 'Mayan Finance',   color: '#14B8A6', desc: 'Solana + EVM → Sui auction · ~1-10 min' },
-  { id: 'axelar',     name: 'Axelar',          color: '#4F46E5', desc: 'EVM → Sui via ITS · live May 2025' },
-  { id: 'allbridge',  name: 'AllBridge Core',  color: '#FF6B6B', desc: 'Solana + EVM → Sui · CCTP zero-slippage' },
+  { id: 'wormhole',   name: 'Wormhole',       color: '#7C3AED', eta: '~15m', desc: 'EVM + Solana → Sui · CCTP USDC · 1-15 min' },
+  { id: 'layerzero',  name: 'LayerZero',       color: '#3B82F6', eta: '~2m',  desc: 'EVM → Sui via Stargate V3 OFT · 1-5 min' },
+  { id: 'celer',      name: 'Celer cBridge',   color: '#00D395', eta: '~10m', desc: 'EVM → Sui lock-and-mint · ETH, USDC, WBTC' },
+  { id: 'mayan',      name: 'Mayan Finance',   color: '#14B8A6', eta: '~3m',  desc: 'Solana + EVM → Sui auction · ~1-10 min' },
+  { id: 'axelar',     name: 'Axelar',          color: '#4F46E5', eta: '~5m',  desc: 'EVM → Sui via ITS · live May 2025' },
+  { id: 'allbridge',  name: 'AllBridge Core',  color: '#FF6B6B', eta: '~2m',  desc: 'Solana + EVM → Sui · CCTP zero-slippage' },
 ]
 
 const HOW_IT_WORKS = [

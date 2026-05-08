@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OmniWeave — The Ultimate Sui Liquidity Layer
+
+OmniWeave is a DEX aggregator built natively on the Sui blockchain. It routes swaps across every major Sui DEX to guarantee best execution, charges a 0.05 % protocol fee, and lets users bridge assets in from any major chain.
+
+## Features
+
+- **Smart Routing** — Graph-based multi-hop and split-route engine across Cetus, Turbos, DeepBook, Aftermath, FlowX, and Kriya
+- **Bridge Aggregator** — Compare Wormhole, LayerZero/Stargate, Celer cBridge, Mayan Finance, Axelar, and AllBridge in one UI
+- **Real-time Prices** — Pyth Network SSE price feeds + CoinGecko metadata
+- **MEV Protection** — Slippage tolerance and transaction deadline enforcement on-chain
+- **Limit Orders** — Native CLOB limit orders via DeepBook v3
+- **Protocol Fee** — 5 bps on every swap, collected in a shared Move treasury
+
+## Tech Stack
+
+| Layer | Tech |
+|---|---|
+| Blockchain | Sui (Move 2024) |
+| Frontend | Next.js 14 App Router, TypeScript, Tailwind CSS |
+| Wallet | @mysten/dapp-kit |
+| Prices | Pyth Network, CoinGecko |
+| Charts | Recharts |
+| State | Zustand, TanStack Query |
+
+## Project Structure
+
+```
+omniweave/
+├── contracts/              # Move smart contracts
+│   ├── sources/
+│   │   ├── omniweave_router.move   # Aggregator router + fee logic
+│   │   ├── omniweave_fees.move     # Treasury & fee collection
+│   │   ├── omniweave_config.move   # Admin config, pause switch
+│   │   └── omniweave_quoter.move   # Off-chain quote types
+│   └── tests/
+├── src/
+│   ├── app/                # Next.js routes
+│   │   ├── swap/           # Main swap interface
+│   │   ├── bridge/         # Cross-chain bridge aggregator
+│   │   ├── pools/          # Pool explorer
+│   │   ├── analytics/      # Protocol analytics
+│   │   ├── portfolio/      # User portfolio
+│   │   └── api/            # Quote + token API routes
+│   ├── components/
+│   │   ├── swap/           # SwapCard, TokenSelector, RouteDisplay
+│   │   ├── bridge/         # BridgeCard, ChainSelector
+│   │   ├── analytics/      # Charts, StatsCard
+│   │   └── layout/         # Header, Footer, MobileMenu
+│   ├── lib/
+│   │   ├── routing/        # Aggregator engine + DEX adapters
+│   │   ├── bridges/        # Bridge provider adapters
+│   │   ├── tokens.ts       # Sui mainnet token list
+│   │   └── pyth.ts         # Price feed integration
+│   └── hooks/              # useSwap, useQuote, useSuiBalance, ...
+```
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # production build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Smart Contract Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd contracts
+sui client publish --gas-budget 200000000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+After publishing, set `NEXT_PUBLIC_ROUTER_PACKAGE_ID` in `.env.local`.
 
-## Learn More
+## Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+Copy `.env.example` to `.env.local` and fill in values:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+NEXT_PUBLIC_SUI_NETWORK=mainnet
+NEXT_PUBLIC_ROUTER_PACKAGE_ID=0x...
+NEXT_PUBLIC_CONFIG_OBJECT_ID=0x...
+NEXT_PUBLIC_TREASURY_OBJECT_ID=0x...
+PYTH_HERMES_URL=https://hermes.pyth.network
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Integrated DEXes
 
-## Deploy on Vercel
+| DEX | Type |
+|---|---|
+| Cetus | CLMM (concentrated liquidity) |
+| Turbos Finance | CLMM |
+| DeepBook v3 | Central limit order book |
+| Aftermath Finance | Weighted AMM |
+| FlowX Finance | Constant-product AMM |
+| Kriya DEX | Constant-product AMM |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Integrated Bridges
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Bridge | Chains | Notes |
+|---|---|---|
+| Wormhole | EVM + Solana | Native SDK, CCTP USDC |
+| LayerZero V2 / Stargate V3 | EVM (140+ chains) | OFT standard |
+| Celer cBridge | EVM | Lock-and-mint |
+| Mayan Finance | Solana + EVM | Auction model |
+| Axelar ITS | EVM | Institutional focus |
+| AllBridge Core | Solana + EVM | CCTP zero-slippage USDC |
+
+## License
+
+MIT

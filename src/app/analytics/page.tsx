@@ -204,6 +204,7 @@ export default function AnalyticsPage() {
                 Top Trading Pairs
               </h2>
             </div>
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
@@ -243,6 +244,7 @@ export default function AnalyticsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
 
           {/* Recent Swaps */}

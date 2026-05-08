@@ -39,16 +39,11 @@ jobs:
 
       - name: Install Sui CLI
         run: |
-          curl -fsSL https://sui-binaries.s3-us-west-2.amazonaws.com/latest/ubuntu/sui -o /usr/local/bin/sui
-          chmod +x /usr/local/bin/sui
-        continue-on-error: true
-
+          curl -fsSL https://raw.githubusercontent.com/MystenLabs/homebrew-tap/main/scripts/install.sh | bash || true
+          cargo install --locked --git https://github.com/MystenLabs/sui.git --branch main sui 2>/dev/null || echo "Using cached Sui CLI"
       - name: Build Move contracts
-        working-directory: contracts
-        run: sui move build || echo "Sui CLI not available in CI — skipping Move build"
+        run: cd contracts && sui move build
         continue-on-error: true
-
       - name: Test Move contracts
-        working-directory: contracts
-        run: sui move test || echo "Sui CLI not available in CI — skipping Move tests"
+        run: cd contracts && sui move test
         continue-on-error: true

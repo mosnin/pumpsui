@@ -17,9 +17,12 @@ const config: Config = {
         inter:           ['var(--font-inter)', 'sans-serif'],
       },
       animation: {
-        blob:        'blob 7s infinite',
-        'spin-slow': 'spin 3s linear infinite',
-        shimmer:     'shimmer 2s infinite',
+        blob:             'blob 7s infinite',
+        'spin-slow':      'spin 3s linear infinite',
+        shimmer:          'shimmer 2s infinite',
+        'toast-in':       'toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'toast-out':      'toast-out 0.2s ease-in forwards',
+        'toast-swipe-out':'toast-swipe-out 0.2s ease-out forwards',
       },
       keyframes: {
         blob: {
@@ -30,6 +33,18 @@ const config: Config = {
         shimmer: {
           '0%':   { backgroundPosition: '-1000px 0' },
           '100%': { backgroundPosition: '1000px 0' },
+        },
+        'toast-in': {
+          from: { opacity: '0', transform: 'translateX(calc(100% + 24px))' },
+          to:   { opacity: '1', transform: 'translateX(0)' },
+        },
+        'toast-out': {
+          from: { opacity: '1', transform: 'translateX(0)' },
+          to:   { opacity: '0', transform: 'translateX(calc(100% + 24px))' },
+        },
+        'toast-swipe-out': {
+          from: { transform: 'translateX(var(--radix-toast-swipe-end-x))' },
+          to:   { opacity: '0', transform: 'translateX(calc(100% + 24px))' },
         },
       },
       backgroundImage: {

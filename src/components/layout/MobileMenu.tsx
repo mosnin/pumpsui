@@ -13,10 +13,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Swap', href: '/swap' },
+  { label: 'Limit', href: '/limit' },
   { label: 'Bridge', href: '/bridge' },
   { label: 'Pools', href: '/pools' },
   { label: 'Analytics', href: '/analytics' },
   { label: 'Portfolio', href: '/portfolio' },
+  { label: 'Leaderboard', href: '/leaderboard' },
+  { label: 'Referral', href: '/referral' },
 ]
 
 interface MobileMenuProps {
@@ -93,7 +96,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
               {/* Close button */}
               <button
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
                 aria-label="Close menu"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -192,6 +195,14 @@ function NavIcon({ label, active }: { label: string; active: boolean }) {
         <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
       </svg>
     ),
+    Limit: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <line x1="3" y1="8" x2="21" y2="8" />
+        <line x1="3" y1="16" x2="21" y2="16" />
+        <circle cx="8" cy="8" r="2" fill={color} stroke="none" />
+        <circle cx="16" cy="16" r="2" fill={color} stroke="none" />
+      </svg>
+    ),
     Bridge: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
@@ -215,6 +226,24 @@ function NavIcon({ label, active }: { label: string; active: boolean }) {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
         <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
         <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
+      </svg>
+    ),
+    Leaderboard: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <path d="M8 6H5a1 1 0 00-1 1v10a1 1 0 001 1h3" />
+        <path d="M16 6h3a1 1 0 011 1v10a1 1 0 01-1 1h-3" />
+        <rect x="8" y="2" width="8" height="20" rx="1" />
+        <path d="M12 6v4l2 2" />
+      </svg>
+    ),
+    Referral: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <circle cx="9" cy="8" r="3" />
+        <path d="M6.5 21C6.5 17.96 7.41 15.5 9 15.5" />
+        <circle cx="17" cy="15" r="3" />
+        <path d="M14.5 21C14.5 18.52 15.57 16.5 17 16.5" />
+        <path d="M14 9l2-2-2-2" />
+        <path d="M12 7h4" />
       </svg>
     ),
   }

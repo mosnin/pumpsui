@@ -1,6 +1,81 @@
 'use client'
 
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import SwapCard from '@/components/swap/SwapCard'
+import { PriceChart } from '@/components/swap/PriceChart'
+import { useSwap } from '@/hooks/useSwap'
+
+// ─── Swap / Limit tab nav ─────────────────────────────────────────────────────
+
+function SwapLimitTabs() {
+  const pathname = usePathname()
+  const tabs = [
+    { label: 'Swap', href: '/swap' },
+    { label: 'Limit', href: '/limit' },
+  ]
+  return (
+    <div
+      className="flex items-center gap-1 p-1 rounded-xl"
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(99,102,241,0.15)',
+      }}
+    >
+      {tabs.map(({ label, href }) => {
+        const active = pathname === href
+        return (
+          <Link
+            key={href}
+            href={href}
+            className="px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-150"
+            style={{
+              background: active
+                ? 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(6,182,212,0.2))'
+                : 'transparent',
+              color: active ? '#818CF8' : '#64748B',
+              border: active ? '1px solid rgba(99,102,241,0.35)' : '1px solid transparent',
+            }}
+          >
+            {label}
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Inner page (needs swap context for chart token detection) ────────────────
+
+function SwapPageInner() {
+  const swap = useSwap()
+
+  // Determine which token to chart: prefer tokenIn, fall back to SUI
+  const chartToken = swap.tokenIn ?? swap.tokenOut
+  const coingeckoId = chartToken?.coingeckoId ?? 'sui'
+  const tokenSymbol = chartToken?.symbol ?? 'SUI'
+
+  return (
+    <div className="w-full flex flex-col items-center gap-4">
+      {/* Swap | Limit tabs */}
+      <SwapLimitTabs />
+
+      {/* Price chart — shown when at least one token is selected */}
+      <div className="w-full max-w-md">
+        <PriceChart
+          tokenSymbol={tokenSymbol}
+          coingeckoId={coingeckoId}
+          height={180}
+        />
+      </div>
+
+      {/* Swap card */}
+      <div className="w-full max-w-md">
+        <SwapCard />
+      </div>
+    </div>
+  )
+}
 
 export default function SwapPage() {
   return (
@@ -102,10 +177,8 @@ export default function SwapPage() {
           </p>
         </div>
 
-        {/* Swap card */}
-        <div className="w-full max-w-md">
-          <SwapCard />
-        </div>
+        {/* Swap + chart */}
+        <SwapPageInner />
 
         {/* Powered-by badge */}
         <div className="flex items-center gap-2 mt-2">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { Transaction } from '@mysten/sui/transactions'
 import { useSwap } from '@/hooks/useSwap'
 import { useTokenPrice } from '@/hooks/useTokenPrices'
 import { Token } from '@/lib/tokens'
@@ -9,6 +10,7 @@ import TokenSelector from './TokenSelector'
 import TokenModal from './TokenModal'
 import RouteDisplay from './RouteDisplay'
 import SlippageSettings from './SlippageSettings'
+import { ConfirmSwapModal } from './ConfirmSwapModal'
 
 type ModalTarget = 'in' | 'out' | null
 
@@ -16,6 +18,7 @@ export function SwapCard() {
   const swap = useSwap()
   const [modalTarget, setModalTarget] = useState<ModalTarget>(null)
   const [flipping, setFlipping] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const priceIn = useTokenPrice(swap.tokenIn?.coingeckoId)
   const priceOut = useTokenPrice(swap.tokenOut?.coingeckoId)
@@ -146,7 +149,7 @@ export function SwapCard() {
             />
             <button
               onClick={handleFlip}
-              className="relative z-10 w-9 h-9 rounded-xl flex items-center justify-center"
+              className="relative z-10 w-11 h-11 rounded-xl flex items-center justify-center"
               style={{
                 background: 'linear-gradient(135deg, #1e1e3a 0%, #12122a 100%)',
                 border: '1px solid rgba(99,102,241,0.3)',
@@ -236,7 +239,7 @@ export function SwapCard() {
 
           {/* CTA Button */}
           <button
-            onClick={canSwap ? swap.executeSwap : undefined}
+            onClick={canSwap ? () => setConfirmOpen(true) : undefined}
             disabled={!canSwap}
             className="w-full mt-4 py-4 rounded-2xl font-bold text-base relative overflow-hidden"
             style={{
@@ -308,6 +311,28 @@ export function SwapCard() {
           modalTarget === 'in' ? swap.tokenOut?.address : swap.tokenIn?.address
         }
       />
+
+      {/* Confirm swap modal — only mounted when we have the required data */}
+      {swap.tokenIn && swap.tokenOut && swap.quote && (
+        <ConfirmSwapModal
+          open={confirmOpen}
+          onClose={() => setConfirmOpen(false)}
+          tokenIn={swap.tokenIn}
+          tokenOut={swap.tokenOut}
+          amountIn={swap.amountIn}
+          amountOut={swap.amountOut}
+          priceImpact={swap.quote.priceImpact}
+          route={swap.quote}
+          slippageBps={swap.settings.slippageBps}
+          onBuildTx={() => {
+            // Placeholder PTB — replace with real transaction builder
+            return new Transaction()
+          }}
+          onSwapAgain={() => {
+            swap.setAmountIn('')
+          }}
+        />
+      )}
     </>
   )
 }
