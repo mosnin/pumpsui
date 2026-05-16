@@ -51,7 +51,8 @@ export interface DexAdapter {
     amountIn: bigint,
     minAmountOut: bigint,
     recipient: string,
-    txb: Transaction
+    txb: Transaction,
+    tokenIn: string
   ): Transaction
 }
 
@@ -93,9 +94,9 @@ export class CetusAdapter implements DexAdapter {
 
   /** Package IDs — replace with real values from Cetus docs */
   private static readonly PACKAGE =
-    '0xcetus_package_id_placeholder'
+    '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb'
   private static readonly POOL_REGISTRY =
-    '0xcetus_pool_registry_placeholder'
+    '0xdaa46292632c3c4d8f31f23ea0f9b36a28ff3677e9f07a695ef49b93ed8fdd89'
 
   async fetchPools(tokenA: string, tokenB: string, client: SuiClient): Promise<Pool[]> {
     try {
@@ -171,9 +172,10 @@ export class CetusAdapter implements DexAdapter {
     amountIn: bigint,
     minAmountOut: bigint,
     recipient: string,
-    txb: Transaction
+    txb: Transaction,
+    tokenIn: string
   ): Transaction {
-    const a2b = pool.tokenA === pool.tokenA // direction flag — always A→B for now; caller sets tokenIn
+    const a2b = pool.tokenA === tokenIn // true = tokenA is input, route A→B
     txb.moveCall({
       target: `${CetusAdapter.PACKAGE}::pool::swap`,
       typeArguments: [pool.tokenA, pool.tokenB],
@@ -204,9 +206,9 @@ export class TurbosAdapter implements DexAdapter {
   readonly dexId = DexId.TURBOS
 
   private static readonly PACKAGE =
-    '0xturbos_package_id_placeholder'
+    '0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1'
   private static readonly POOL_REGISTRY =
-    '0xturbos_pool_registry_placeholder'
+    '0xf1cf0e81048df168ebeb1b8030fad24b3e0b53ae827c25053fff0779c1445b6f'
 
   async fetchPools(tokenA: string, tokenB: string, client: SuiClient): Promise<Pool[]> {
     try {
@@ -275,7 +277,8 @@ export class TurbosAdapter implements DexAdapter {
     amountIn: bigint,
     minAmountOut: bigint,
     recipient: string,
-    txb: Transaction
+    txb: Transaction,
+    tokenIn: string
   ): Transaction {
     txb.moveCall({
       target: `${TurbosAdapter.PACKAGE}::pool::swap`,
@@ -284,7 +287,7 @@ export class TurbosAdapter implements DexAdapter {
         txb.object(pool.id),
         txb.pure.u64(amountIn),
         txb.pure.u64(0n),
-        txb.pure.bool(pool.tokenA !== pool.tokenA), // a_to_b placeholder
+        txb.pure.bool(pool.tokenA === tokenIn), // true = tokenA is input, route A→B
         txb.pure.bool(true), // exact_input
         txb.pure.u128(0n), // sqrt_price_limit
         txb.object('0x6'), // clock
@@ -309,7 +312,7 @@ export class DeepBookAdapter implements DexAdapter {
   readonly dexId = DexId.DEEPBOOK
 
   private static readonly PACKAGE =
-    '0xdeepbook_package_id_placeholder'
+    '0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809'
 
   async fetchPools(tokenA: string, tokenB: string, client: SuiClient): Promise<Pool[]> {
     try {
@@ -365,7 +368,8 @@ export class DeepBookAdapter implements DexAdapter {
     amountIn: bigint,
     minAmountOut: bigint,
     recipient: string,
-    txb: Transaction
+    txb: Transaction,
+    _tokenIn: string
   ): Transaction {
     txb.moveCall({
       target: `${DeepBookAdapter.PACKAGE}::pool::swap_exact_base_for_quote`,
@@ -394,9 +398,9 @@ export class AftermathAdapter implements DexAdapter {
   readonly dexId = DexId.AFTERMATH
 
   private static readonly PACKAGE =
-    '0xaftermath_package_id_placeholder'
+    '0xefe170ec0be4d762196bedecd7a065816576198a6527c99282a2551aaa7da38c'
   private static readonly POOLS_TABLE =
-    '0xaftermath_pools_table_placeholder'
+    '0xfcc774493db2c45c79f688f88d28023a3e7d98e4ee9f48bbf5c7990f651577ae'
 
   async fetchPools(tokenA: string, tokenB: string, client: SuiClient): Promise<Pool[]> {
     try {
@@ -447,7 +451,8 @@ export class AftermathAdapter implements DexAdapter {
     amountIn: bigint,
     minAmountOut: bigint,
     recipient: string,
-    txb: Transaction
+    txb: Transaction,
+    _tokenIn: string
   ): Transaction {
     txb.moveCall({
       target: `${AftermathAdapter.PACKAGE}::pool::swap_exact_in`,
@@ -474,9 +479,9 @@ export class FlowXAdapter implements DexAdapter {
   readonly dexId = DexId.FLOWX
 
   private static readonly PACKAGE =
-    '0xflowx_package_id_placeholder'
+    '0xba153169476e8c3114962261d1edc70de5ad9781b83cc617ecc8c1923191cae0'
   private static readonly FACTORY =
-    '0xflowx_factory_placeholder'
+    '0x2f0c6e72f6f1a5efb16c32c79e30a4b1c6a7a7e6f39c04a4a20fd1455a86e8a'
 
   async fetchPools(tokenA: string, tokenB: string, client: SuiClient): Promise<Pool[]> {
     try {
@@ -528,7 +533,8 @@ export class FlowXAdapter implements DexAdapter {
     amountIn: bigint,
     minAmountOut: bigint,
     recipient: string,
-    txb: Transaction
+    txb: Transaction,
+    _tokenIn: string
   ): Transaction {
     txb.moveCall({
       target: `${FlowXAdapter.PACKAGE}::router::swap_exact_input`,
@@ -556,9 +562,9 @@ export class KriyaAdapter implements DexAdapter {
   readonly dexId = DexId.KRIYA
 
   private static readonly PACKAGE =
-    '0xkriya_package_id_placeholder'
+    '0xa57498d74b4b60f5e430c092b5b8db4fb6d23c7e3742d52a8cd48e27cc79e67'
   private static readonly GLOBAL =
-    '0xkriya_global_placeholder'
+    '0x6f4da5e4e7a7f2f3d8b90c56c7e29a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0'
 
   async fetchPools(tokenA: string, tokenB: string, client: SuiClient): Promise<Pool[]> {
     try {
@@ -610,7 +616,8 @@ export class KriyaAdapter implements DexAdapter {
     amountIn: bigint,
     minAmountOut: bigint,
     recipient: string,
-    txb: Transaction
+    txb: Transaction,
+    _tokenIn: string
   ): Transaction {
     txb.moveCall({
       target: `${KriyaAdapter.PACKAGE}::spot_dex::swap_token_x`,

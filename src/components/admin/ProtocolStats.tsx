@@ -11,6 +11,7 @@ import {
   Shield,
   Wallet,
 } from 'lucide-react'
+import { useSuiClientQuery } from '@mysten/dapp-kit'
 import { Card } from '@/components/ui/Card'
 import { formatUSD } from '@/lib/formatters'
 import { formatTokenAmount } from '@/lib/formatters'
@@ -32,8 +33,42 @@ const MOCK_REVENUE = {
   h24Usd: 12_840.72,
   h7dUsd: 87_920.15,
   h30dUsd: 341_500.0,
+  suiCollected: 4_820.5, // SUI token amount, not USD
   totalSwaps: 2_847_193,
   activePools: 312,
+}
+
+// ─── Badge components ─────────────────────────────────────────────────────────
+
+function LiveBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      style={{
+        background: 'rgba(16,185,129,0.15)',
+        border: '1px solid rgba(16,185,129,0.3)',
+        color: '#10B981',
+      }}
+    >
+      <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+      Live
+    </span>
+  )
+}
+
+function EstBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      style={{
+        background: 'rgba(245,158,11,0.12)',
+        border: '1px solid rgba(245,158,11,0.25)',
+        color: '#F59E0B',
+      }}
+    >
+      Est.
+    </span>
+  )
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -44,10 +79,10 @@ interface StatTileProps {
   subValue?: string
   icon: React.ReactNode
   accentColor?: string
-  trend?: 'up' | 'down' | 'neutral'
+  isLive?: boolean
 }
 
-function StatTile({ label, value, subValue, icon, accentColor = '#6366F1' }: StatTileProps) {
+function StatTile({ label, value, subValue, icon, accentColor = '#6366F1', isLive }: StatTileProps) {
   return (
     <div
       className="relative overflow-hidden rounded-xl p-5 flex flex-col gap-3"
@@ -64,9 +99,12 @@ function StatTile({ label, value, subValue, icon, accentColor = '#6366F1' }: Sta
       />
 
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-          {label}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+            {label}
+          </span>
+          {isLive !== undefined && (isLive ? <LiveBadge /> : <EstBadge />)}
+        </div>
         <div
           className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
           style={{
@@ -152,6 +190,26 @@ function RevenueBar({ label, value, fraction, color }: RevenueBarProps) {
 export function ProtocolStats({ config, treasuryBalances, tokenPrices = {} }: ProtocolStatsProps) {
   const feePct = (config.feeBps / 100).toFixed(2)
 
+  const treasuryObjectId = process.env.NEXT_PUBLIC_TREASURY_OBJECT_ID ?? '0x0'
+  const suiCoinType = '0x2::sui::SUI'
+
+  // Attempt to read live SUI treasury balance from chain
+  const { data: treasuryBalance } = useSuiClientQuery(
+    'getBalance',
+    {
+      owner: treasuryObjectId,
+      coinType: suiCoinType,
+    },
+    {
+      enabled: !!treasuryObjectId && treasuryObjectId !== '0x0',
+    },
+  )
+
+  const suiFeesCollected = treasuryBalance
+    ? Number(treasuryBalance.totalBalance) / 1e9
+    : MOCK_REVENUE.suiCollected
+  const suiFeesIsLive = !!treasuryBalance
+
   return (
     <div className="flex flex-col gap-6">
       {/* ── Top stat tiles ── */}
@@ -162,6 +220,7 @@ export function ProtocolStats({ config, treasuryBalances, tokenPrices = {} }: Pr
           subValue="Since launch"
           icon={<DollarSign size={16} />}
           accentColor="#6366F1"
+          isLive={false}
         />
         <StatTile
           label="Revenue 24h"
@@ -169,6 +228,7 @@ export function ProtocolStats({ config, treasuryBalances, tokenPrices = {} }: Pr
           subValue={`7d: ${formatUSD(MOCK_REVENUE.h7dUsd)}`}
           icon={<TrendingUp size={16} />}
           accentColor="#06B6D4"
+          isLive={false}
         />
         <StatTile
           label="Revenue 30d"
@@ -176,13 +236,15 @@ export function ProtocolStats({ config, treasuryBalances, tokenPrices = {} }: Pr
           subValue="Rolling window"
           icon={<Clock size={16} />}
           accentColor="#818CF8"
+          isLive={false}
         />
         <StatTile
-          label="Total Swaps"
-          value={MOCK_REVENUE.totalSwaps.toLocaleString()}
-          subValue="All-time processed"
-          icon={<Activity size={16} />}
+          label="SUI Collected"
+          value={`${suiFeesCollected.toLocaleString(undefined, { maximumFractionDigits: 2 })} SUI`}
+          subValue="Treasury balance"
+          icon={<Wallet size={16} />}
           accentColor="#10B981"
+          isLive={suiFeesIsLive}
         />
         <StatTile
           label="Active Pools"
@@ -190,6 +252,7 @@ export function ProtocolStats({ config, treasuryBalances, tokenPrices = {} }: Pr
           subValue="Integrated sources"
           icon={<Layers size={16} />}
           accentColor="#F59E0B"
+          isLive={false}
         />
         <StatTile
           label="Protocol Fee"
@@ -197,6 +260,7 @@ export function ProtocolStats({ config, treasuryBalances, tokenPrices = {} }: Pr
           subValue={`${config.feeBps} basis points`}
           icon={<Zap size={16} />}
           accentColor={config.paused ? '#EF4444' : '#6366F1'}
+          isLive={true}
         />
       </div>
 
@@ -209,6 +273,7 @@ export function ProtocolStats({ config, treasuryBalances, tokenPrices = {} }: Pr
             <h3 className="text-sm font-semibold text-[#E2E8F0] uppercase tracking-widest">
               Revenue Breakdown
             </h3>
+            <EstBadge />
           </div>
 
           <div className="flex flex-col gap-4">

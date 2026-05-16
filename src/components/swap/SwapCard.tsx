@@ -2,10 +2,12 @@
 
 import { useState, useCallback } from 'react'
 import { Transaction } from '@mysten/sui/transactions'
+import { useCurrentAccount, useSuiClientQuery } from '@mysten/dapp-kit'
 import { useSwap } from '@/hooks/useSwap'
 import { useTokenPrice } from '@/hooks/useTokenPrices'
 import { Token } from '@/lib/tokens'
 import { PRICE_IMPACT_DANGER_THRESHOLD, PRICE_IMPACT_WARNING_THRESHOLD } from '@/lib/constants'
+import { buildAggregatedSwapTx } from '@/lib/routing/transactionBuilder'
 import TokenSelector from './TokenSelector'
 import TokenModal from './TokenModal'
 import RouteDisplay from './RouteDisplay'
@@ -16,12 +18,22 @@ type ModalTarget = 'in' | 'out' | null
 
 export function SwapCard() {
   const swap = useSwap()
+  const account = useCurrentAccount()
   const [modalTarget, setModalTarget] = useState<ModalTarget>(null)
   const [flipping, setFlipping] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const priceIn = useTokenPrice(swap.tokenIn?.coingeckoId)
   const priceOut = useTokenPrice(swap.tokenOut?.coingeckoId)
+
+  const { data: balanceData } = useSuiClientQuery(
+    'getBalance',
+    { owner: account?.address ?? '', coinType: swap.tokenIn?.address ?? '0x2::sui::SUI' },
+    { enabled: !!account && !!swap.tokenIn }
+  )
+  const maxBalance = balanceData
+    ? Number(balanceData.totalBalance) / 10 ** (swap.tokenIn?.decimals ?? 9)
+    : 0
 
   const usdIn =
     priceIn !== null && swap.amountIn && parseFloat(swap.amountIn) > 0
@@ -49,9 +61,10 @@ export function SwapCard() {
   )
 
   const handleMax = useCallback(() => {
-    // Placeholder — hook into wallet balance when wallet is connected
-    swap.setAmountIn('100')
-  }, [swap])
+    if (maxBalance > 0) {
+      swap.setAmountIn(maxBalance.toString())
+    }
+  }, [swap, maxBalance])
 
   const priceImpact = swap.quote?.priceImpact ?? 0
   const isHighImpact = priceImpact >= PRICE_IMPACT_WARNING_THRESHOLD
@@ -136,7 +149,7 @@ export function SwapCard() {
             onAmountChange={swap.setAmountIn}
             onTokenClick={() => setModalTarget('in')}
             usdValue={usdIn}
-            balance="1234.56"
+            balance={account ? maxBalance.toFixed(4) : undefined}
             onMax={handleMax}
             label="You pay"
           />
@@ -325,8 +338,17 @@ export function SwapCard() {
           route={swap.quote}
           slippageBps={swap.settings.slippageBps}
           onBuildTx={() => {
-            // Placeholder PTB — replace with real transaction builder
-            return new Transaction()
+            if (!swap.rawQuote || !account?.address) return new Transaction()
+            return buildAggregatedSwapTx(
+              swap.rawQuote,
+              '', // coinIn object ID — will be resolved from wallet coins
+              account.address,
+              swap.settings.slippageBps,
+              {
+                configObjectId: process.env.NEXT_PUBLIC_CONFIG_OBJECT_ID ?? '0x0',
+                treasuryObjectId: process.env.NEXT_PUBLIC_TREASURY_OBJECT_ID ?? '0x0',
+              },
+            )
           }}
           onSwapAgain={() => {
             swap.setAmountIn('')

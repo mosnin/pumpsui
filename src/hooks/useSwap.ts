@@ -9,6 +9,7 @@ import {
   DEX_META,
   DexMeta,
 } from '@/lib/constants'
+import type { QuoteResult, DexId } from '@/lib/routing/types'
 
 export interface RouteStep {
   dex: DexMeta
@@ -42,6 +43,7 @@ export interface UseSwapReturn {
   amountIn: string
   amountOut: string
   quote: SwapQuote | null
+  rawQuote: QuoteResult | null
   loading: boolean
   error: string | null
   settings: SwapSettings
@@ -55,53 +57,223 @@ export interface UseSwapReturn {
   swapping: boolean
 }
 
-// Simulated quote fetcher — replace with real aggregator API
-async function fetchQuote(
-  tokenIn: Token,
+// ---------------------------------------------------------------------------
+// API response types (bigints are serialised as decimal strings over the wire)
+// ---------------------------------------------------------------------------
+
+interface ApiRouteStep {
+  dexId: string
+  poolId: string
+  tokenIn: string
+  tokenOut: string
+  amountIn: string
+  amountOut: string
+  fee: number
+}
+
+interface ApiRoute {
+  inputAmount: string
+  outputAmount: string
+  priceImpact: number
+  gasEstimate: string
+  path: ApiRouteStep[]
+}
+
+interface ApiSplitRoutePortion {
+  portionBps: number
+  inputAmount: string
+  outputAmount: string
+  dexId: string
+  poolId: string
+}
+
+interface ApiSplitRoute {
+  totalOutput: string
+  priceImpact: number
+  routes: ApiSplitRoutePortion[]
+}
+
+interface ApiQuote {
+  useSplit: boolean
+  outputAmount: string
+  priceImpact: number
+  executionPrice: number
+  midPrice: number
+  bestRoute: ApiRoute | null
+  bestSplitRoute: ApiSplitRoute | null
+}
+
+interface ApiQuoteResponse {
+  quote: ApiQuote
+  minAmountOut: string
+  slippageBps: number
+  executedAt: string
+  params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    maxHops: number
+    maxSplits: number
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Deserialise the wire format back to a QuoteResult with proper bigints
+// ---------------------------------------------------------------------------
+
+function deserializeQuoteResult(api: ApiQuote): QuoteResult {
+  return {
+    useSplit: api.useSplit,
+    outputAmount: BigInt(api.outputAmount),
+    priceImpact: api.priceImpact,
+    executionPrice: api.executionPrice,
+    midPrice: api.midPrice,
+    bestRoute: api.bestRoute
+      ? {
+          inputAmount: BigInt(api.bestRoute.inputAmount),
+          outputAmount: BigInt(api.bestRoute.outputAmount),
+          priceImpact: api.bestRoute.priceImpact,
+          gasEstimate: BigInt(api.bestRoute.gasEstimate),
+          path: api.bestRoute.path.map((step) => ({
+            pool: {
+              id: step.poolId,
+              dexId: step.dexId as DexId,
+              tokenA: step.tokenIn,
+              tokenB: step.tokenOut,
+              reserveA: BigInt(0),
+              reserveB: BigInt(0),
+              fee: step.fee,
+              liquidity: BigInt(0),
+            },
+            tokenIn: step.tokenIn,
+            tokenOut: step.tokenOut,
+            amountIn: BigInt(step.amountIn),
+            amountOut: BigInt(step.amountOut),
+          })),
+        }
+      : null,
+    bestSplitRoute: api.bestSplitRoute
+      ? {
+          totalOutput: BigInt(api.bestSplitRoute.totalOutput),
+          priceImpact: api.bestSplitRoute.priceImpact,
+          routes: api.bestSplitRoute.routes.map((portion) => ({
+            portionBps: portion.portionBps,
+            route: {
+              path: [
+                {
+                  pool: {
+                    id: portion.poolId,
+                    dexId: portion.dexId as DexId,
+                    tokenA: '',
+                    tokenB: '',
+                    reserveA: BigInt(0),
+                    reserveB: BigInt(0),
+                    fee: 0,
+                    liquidity: BigInt(0),
+                  },
+                  tokenIn: '',
+                  tokenOut: '',
+                  amountIn: BigInt(portion.inputAmount),
+                  amountOut: BigInt(portion.outputAmount),
+                },
+              ],
+              inputAmount: BigInt(portion.inputAmount),
+              outputAmount: BigInt(portion.outputAmount),
+              priceImpact: 0,
+              gasEstimate: BigInt(0),
+            },
+          })),
+        }
+      : null,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Build display-oriented SwapQuote from the API response
+// ---------------------------------------------------------------------------
+
+function buildSwapQuote(
+  apiQuote: ApiQuote,
+  minAmountOut: string,
   tokenOut: Token,
-  amountIn: string,
   slippageBps: number,
-): Promise<SwapQuote> {
-  await new Promise((r) => setTimeout(r, 300 + Math.random() * 200))
+): SwapQuote {
+  const outputAmount = Number(apiQuote.outputAmount)
+  const outputDisplay = (
+    outputAmount / Math.pow(10, tokenOut.decimals)
+  ).toFixed(Math.min(tokenOut.decimals, 6))
 
-  const inAmt = parseFloat(amountIn)
-  if (isNaN(inAmt) || inAmt <= 0) throw new Error('Invalid amount')
+  const minDisplay = (
+    Number(minAmountOut) / Math.pow(10, tokenOut.decimals)
+  ).toFixed(Math.min(tokenOut.decimals, 6))
 
-  // Simulated rate with slight noise
-  const baseRate = tokenIn.symbol === 'SUI' ? 3.24 : 1 / 3.24
-  const rate = baseRate * (1 - (Math.random() * 0.002 - 0.001))
-  const outAmt = inAmt * rate
+  // Build display steps from whichever route is active
+  let steps: RouteStep[] = []
+  if (apiQuote.useSplit && apiQuote.bestSplitRoute) {
+    steps = apiQuote.bestSplitRoute.routes.map((portion) => {
+      const dex = DEX_META[portion.dexId] ?? {
+        id: portion.dexId,
+        name: portion.dexId,
+        color: '#6366F1',
+        bgColor: 'rgba(99,102,241,0.15)',
+      }
+      return {
+        dex,
+        percentage: Math.round(portion.portionBps / 100),
+        fee: 25,
+      }
+    })
+  } else if (apiQuote.bestRoute) {
+    const seen = new Map<string, number>()
+    for (const step of apiQuote.bestRoute.path) {
+      seen.set(step.dexId, (seen.get(step.dexId) ?? 0) + 1)
+    }
+    const total = apiQuote.bestRoute.path.length
+    steps = Array.from(seen.entries()).map(([dexId, count]) => {
+      const dex = DEX_META[dexId] ?? {
+        id: dexId,
+        name: dexId,
+        color: '#6366F1',
+        bgColor: 'rgba(99,102,241,0.15)',
+      }
+      return {
+        dex,
+        percentage: Math.round((count / total) * 100),
+        fee: 25,
+      }
+    })
+  }
 
-  const priceImpact = inAmt > 1000 ? Math.min(inAmt / 50000, 5) : 0.04
-
-  // Simulated route split across DEXes
-  const dexKeys = Object.keys(DEX_META)
-  const usedDexes = dexKeys.slice(0, inAmt > 500 ? 3 : 2)
-  const pcts =
-    usedDexes.length === 2 ? [60, 40] : [50, 30, 20]
-
-  const steps: RouteStep[] = usedDexes.map((key, i) => ({
-    dex: DEX_META[key],
-    percentage: pcts[i],
-    fee: 25,
-  }))
-
-  const slippageFactor = 1 - slippageBps / 10000
-  const minimumReceived = (outAmt * slippageFactor).toFixed(
-    Math.min(tokenOut.decimals, 6),
-  )
+  const estimatedFeeUsd = (outputAmount / Math.pow(10, tokenOut.decimals) * 0.0005).toFixed(2)
 
   return {
-    amountOut: outAmt.toFixed(Math.min(tokenOut.decimals, 6)),
+    amountOut: outputDisplay,
     route: {
       steps,
-      priceImpact,
-      minimumReceived,
-      fee: (inAmt * 0.0005 * 3.24).toFixed(2),
+      priceImpact: apiQuote.priceImpact,
+      minimumReceived: minDisplay,
+      fee: estimatedFeeUsd,
     },
-    exchangeRate: rate,
-    priceImpact,
+    exchangeRate: apiQuote.executionPrice,
+    priceImpact: apiQuote.priceImpact,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Real quote fetcher — calls /api/quote
+// ---------------------------------------------------------------------------
+
+async function fetchQuote(
+  tokenIn: string,
+  tokenOut: string,
+  amountInRaw: bigint,
+): Promise<ApiQuoteResponse | null> {
+  const res = await fetch(
+    `/api/quote?tokenIn=${encodeURIComponent(tokenIn)}&tokenOut=${encodeURIComponent(tokenOut)}&amountIn=${amountInRaw.toString()}`,
+    { signal: AbortSignal.timeout(10_000) }
+  )
+  if (!res.ok) return null
+  return res.json()
 }
 
 export function useSwap(): UseSwapReturn {
@@ -110,6 +282,7 @@ export function useSwap(): UseSwapReturn {
   const [amountIn, setAmountInState] = useState<string>('')
   const [amountOut, setAmountOutState] = useState<string>('')
   const [quote, setQuote] = useState<SwapQuote | null>(null)
+  const [rawQuote, setRawQuote] = useState<QuoteResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [swapping, setSwapping] = useState(false)
@@ -126,6 +299,7 @@ export function useSwap(): UseSwapReturn {
     async (tIn: Token, tOut: Token, amt: string, slippage: number) => {
       if (!amt || parseFloat(amt) <= 0) {
         setQuote(null)
+        setRawQuote(null)
         setAmountOutState('')
         setLoading(false)
         return
@@ -135,13 +309,22 @@ export function useSwap(): UseSwapReturn {
       abortRef.current?.abort()
       abortRef.current = new AbortController()
       try {
-        const q = await fetchQuote(tIn, tOut, amt, slippage)
-        setQuote(q)
-        setAmountOutState(q.amountOut)
+        // Convert display amount to raw base units using token decimals
+        const amountInRaw = BigInt(
+          Math.round(parseFloat(amt) * Math.pow(10, tIn.decimals))
+        )
+        const response = await fetchQuote(tIn.address, tOut.address, amountInRaw)
+        if (!response) throw new Error('Failed to fetch quote')
+        const displayQuote = buildSwapQuote(response.quote, response.minAmountOut, tOut, slippage)
+        const deserializedQuote = deserializeQuoteResult(response.quote)
+        setQuote(displayQuote)
+        setRawQuote(deserializedQuote)
+        setAmountOutState(displayQuote.amountOut)
       } catch (err) {
         if (err instanceof Error) {
           setError(err.message)
           setQuote(null)
+          setRawQuote(null)
           setAmountOutState('')
         }
       } finally {
@@ -223,11 +406,12 @@ export function useSwap(): UseSwapReturn {
     setSwapping(true)
     setError(null)
     try {
-      // Placeholder — integrate with @mysten/dapp-kit + actual DEX SDKs
-      await new Promise((r) => setTimeout(r, 1500))
+      // Transaction execution is handled by ConfirmSwapModal via useExecuteSwap.
+      // This function resets state after a confirmed swap.
       setAmountInState('')
       setAmountOutState('')
       setQuote(null)
+      setRawQuote(null)
     } catch (err) {
       if (err instanceof Error) setError(err.message)
     } finally {
@@ -248,6 +432,7 @@ export function useSwap(): UseSwapReturn {
     amountIn,
     amountOut,
     quote,
+    rawQuote,
     loading,
     error,
     settings,

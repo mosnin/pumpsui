@@ -47,13 +47,22 @@ export interface SwapEvent {
 // ─── Contract constants ────────────────────────────────────────────────────────
 
 /**
- * Event type to subscribe to.  Update this to the deployed package ID once
- * OmniWeave is live on mainnet.
+ * Deployed OmniWeave router package ID.
+ * Set NEXT_PUBLIC_ROUTER_PACKAGE_ID in your environment once the contract is
+ * live on mainnet.  When unset the hook falls back to deterministic mock data
+ * so the UI remains functional during development.
+ */
+const PACKAGE_ID = process.env.NEXT_PUBLIC_ROUTER_PACKAGE_ID ?? ''
+
+/**
+ * Event type to subscribe to.  Null when the package ID is not yet configured,
+ * which causes the hook to skip the RPC query and return mock data instead.
  *
  * Format: "{packageId}::{module}::{EventStruct}"
  */
-const OMNIWEAVE_SWAP_EVENT_TYPE =
-  '0x0000000000000000000000000000000000000000000000000000000000000001::omniweave::SwapExecuted'
+const EVENT_TYPE: string | null = PACKAGE_ID
+  ? `${PACKAGE_ID}::omniweave_router::SwapExecuted`
+  : null
 
 /** How often to poll the RPC for new events (ms). SSE is preferred; polling is a fallback. */
 const POLL_INTERVAL_MS = 8_000
@@ -137,7 +146,7 @@ export interface UseRecentSwapsResult {
  * While the contract is not yet deployed, the hook returns deterministic mock
  * data so components can be built and tested in isolation.
  *
- * Once deployed, set OMNIWEAVE_SWAP_EVENT_TYPE to the real package ID and the
+ * Once deployed, set NEXT_PUBLIC_ROUTER_PACKAGE_ID to the real package ID and the
  * hook will switch from mock → live data automatically.
  *
  * @param limit - Maximum number of recent swap events to keep in state (default 10)
@@ -155,12 +164,19 @@ export function useRecentSwaps(limit = 10): UseRecentSwapsResult {
 
   const fetchEvents = useCallback(
     async (suiClient: SuiQueryClient, isInitial: boolean) => {
+      // Package not yet deployed — skip RPC call and use mock data
+      if (!EVENT_TYPE) {
+        setIsMockData(true)
+        if (isInitial) setSwaps(generateMockSwaps(limit))
+        return
+      }
+
       if (isInitial) setLoading(true)
       setError(null)
 
       try {
         const page = await suiClient.queryEvents({
-          query:  { MoveEventType: OMNIWEAVE_SWAP_EVENT_TYPE },
+          query:  { MoveEventType: EVENT_TYPE },
           cursor: cursorRef.current,
           limit,
           order:  'descending',
@@ -171,7 +187,7 @@ export function useRecentSwaps(limit = 10): UseRecentSwapsResult {
           .filter((e): e is SwapEvent => e !== null)
 
         if (parsed.length === 0 && isInitial) {
-          // Contract not yet deployed — fall back to mock data
+          // Contract deployed but no events yet — fall back to mock data
           setIsMockData(true)
           setSwaps(generateMockSwaps(limit))
         } else {

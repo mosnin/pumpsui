@@ -118,7 +118,7 @@ export function buildSingleSwapTx(
     // Append the DEX-specific swap call.
     // currentCoin is passed conceptually — real threading requires capturing
     // the moveCall result. See note at top of file.
-    adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb)
+    adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb, step.tokenIn)
 
     // After the last hop, `currentCoin` still holds the split coin reference.
     // In a full integration you'd reassign `currentCoin` to the moveCall result.
@@ -182,7 +182,7 @@ export function buildSplitSwapTx(
 
     const minOut = applySlippage(step.amountOut, slippageBps)
 
-    adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb)
+    adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb, step.tokenIn)
 
     // Collect the portion coin reference; a real integration captures moveCall result
     const portionCoin = Array.isArray(portionCoins) ? portionCoins[i] : portionCoins

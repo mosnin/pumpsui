@@ -300,12 +300,27 @@ export default function AdminPage() {
   }
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
+  const isDeployed =
+    !!process.env.NEXT_PUBLIC_CONFIG_OBJECT_ID &&
+    process.env.NEXT_PUBLIC_CONFIG_OBJECT_ID !== '0x0'
+
   return (
     <div
       className="min-h-screen px-4 py-8 md:px-8"
       style={{ background: '#060611' }}
     >
       <div className="max-w-7xl mx-auto flex flex-col gap-8">
+
+        {/* Not-deployed banner */}
+        {!isDeployed && (
+          <div className="mb-6 p-4 rounded-xl border border-orange-500/30 bg-orange-500/10">
+            <p className="text-orange-300 font-medium">⚠️ Contracts not deployed</p>
+            <p className="text-orange-400/70 text-sm mt-1">
+              Run <code className="bg-black/30 px-1 rounded">contracts/deploy.sh</code> and set
+              environment variables to activate live data and admin functions.
+            </p>
+          </div>
+        )}
 
         {/* Page header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -360,7 +375,7 @@ export default function AdminPage() {
         {dataError && (
           <div className="flex items-center gap-2 text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
             <AlertTriangle size={15} />
-            {dataError} — Showing mock data.
+            {dataError}
           </div>
         )}
 

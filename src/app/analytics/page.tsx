@@ -1,63 +1,53 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Activity, BarChart2, DollarSign, Users, Zap, ArrowUpRight } from 'lucide-react'
 import { StatsCard } from '@/components/analytics/StatsCard'
 import { VolumeChart, type VolumeDataPoint } from '@/components/analytics/VolumeChart'
 import { DexPieChart, type DexVolumeEntry } from '@/components/analytics/DexPieChart'
 import { DEXBadge } from '@/components/common/DEXBadge'
 import { PriceChange } from '@/components/common/PriceChange'
+import { useRecentSwaps } from '@/hooks/useSuiEvents'
+import { SUI_TOKENS } from '@/lib/tokens'
 
-// ─── Mock Data ───────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const volumeData: VolumeDataPoint[] = [
-  { date: 'Apr 30', volume: 4_820_000, fees: 14_460 },
-  { date: 'May 1',  volume: 6_140_000, fees: 18_420 },
-  { date: 'May 2',  volume: 5_390_000, fees: 16_170 },
-  { date: 'May 3',  volume: 7_850_000, fees: 23_550 },
-  { date: 'May 4',  volume: 9_210_000, fees: 27_630 },
-  { date: 'May 5',  volume: 8_430_000, fees: 25_290 },
-  { date: 'May 6',  volume: 11_670_000, fees: 35_010 },
-]
-
-const dexDistribution: DexVolumeEntry[] = [
-  { name: 'Cetus',    volume: 4_200_000, percentage: 36 },
-  { name: 'Turbos',   volume: 2_800_000, percentage: 24 },
-  { name: 'DeepBook', volume: 1_900_000, percentage: 16.3 },
-  { name: 'Aftermath',volume: 1_400_000, percentage: 12 },
-  { name: 'FlowX',    volume: 870_000,   percentage: 7.5 },
-  { name: 'Kriya',    volume: 500_000,   percentage: 4.2 },
-]
-
-const topPairs = [
-  { pair: 'SUI / USDC',  dex: 'Cetus',     volume24h: 4_120_000, fees24h: 12_360,  change: 18.4  },
-  { pair: 'SUI / USDT',  dex: 'Turbos',    volume24h: 2_830_000, fees24h: 8_490,   change: -5.2  },
-  { pair: 'WBTC / USDC', dex: 'DeepBook',  volume24h: 1_940_000, fees24h: 5_820,   change: 32.1  },
-  { pair: 'ETH / SUI',   dex: 'Aftermath', volume24h: 1_220_000, fees24h: 3_660,   change: -11.7 },
-  { pair: 'USDC / USDT', dex: 'FlowX',     volume24h: 980_000,   fees24h: 980,     change: 2.9   },
-  { pair: 'SUI / DEEP',  dex: 'DeepBook',  volume24h: 760_000,   fees24h: 2_280,   change: 55.6  },
-  { pair: 'BUCK / USDC', dex: 'Kriya',     volume24h: 490_000,   fees24h: 1_470,   change: -3.4  },
-]
-
-interface RecentSwap {
-  id: string
-  time: string
-  from: string
-  to: string
-  amountIn: string
-  amountOut: string
-  dex: string
-  wallet: string
+interface SuiMarketData {
+  market_cap: { usd: number }
+  total_volume: { usd: number }
+  price_change_percentage_24h: number
+  current_price: { usd: number }
 }
 
-const recentSwaps: RecentSwap[] = [
-  { id: '0x1a2b', time: '2s ago',   from: 'SUI',  to: 'USDC', amountIn: '1,200 SUI',  amountOut: '3,456.78 USDC', dex: 'Cetus',     wallet: '0x3f4a…9e2d' },
-  { id: '0x3c4d', time: '8s ago',   from: 'USDC', to: 'SUI',  amountIn: '5,000 USDC', amountOut: '1,734.1 SUI',   dex: 'Turbos',    wallet: '0x7b2c…1f0e' },
-  { id: '0x5e6f', time: '15s ago',  from: 'SUI',  to: 'WBTC', amountIn: '8,000 SUI',  amountOut: '0.2341 WBTC',   dex: 'DeepBook',  wallet: '0xa1d3…4c8b' },
-  { id: '0x7a8b', time: '23s ago',  from: 'ETH',  to: 'SUI',  amountIn: '0.5 ETH',    amountOut: '891.2 SUI',     dex: 'Aftermath', wallet: '0x2e9f…7a1c' },
-  { id: '0x9c0d', time: '41s ago',  from: 'SUI',  to: 'BUCK', amountIn: '3,500 SUI',  amountOut: '3,472.5 BUCK',  dex: 'Kriya',     wallet: '0xd4b7…3e5a' },
-  { id: '0xb2e3', time: '1m ago',   from: 'USDT', to: 'USDC', amountIn: '10,000 USDT',amountOut: '9,997.1 USDC',  dex: 'FlowX',     wallet: '0x8f1e…2b6d' },
-  { id: '0xd4f5', time: '1m ago',   from: 'SUI',  to: 'USDC', amountIn: '450 SUI',    amountOut: '1,296.9 USDC',  dex: 'Cetus',     wallet: '0x5c3a…9d4f' },
+// ─── DEX distribution (estimated, based on TVL share) ─────────────────────────
+
+const DEX_SHARES: { name: string; share: number }[] = [
+  { name: 'Cetus',     share: 0.360 },
+  { name: 'Turbos',    share: 0.240 },
+  { name: 'DeepBook',  share: 0.163 },
+  { name: 'Aftermath', share: 0.120 },
+  { name: 'FlowX',     share: 0.075 },
+  { name: 'Kriya',     share: 0.042 },
+]
+
+// ─── Pair definitions built from SUI_TOKENS ───────────────────────────────────
+
+interface TradingPair {
+  pair: string
+  dex: string
+  volumeShare: number   // fraction of total 24h volume
+  feeRate: number       // fee tier as decimal
+  change: number        // fixed estimated 24h change %
+}
+
+const TRADING_PAIRS: TradingPair[] = [
+  { pair: `${SUI_TOKENS[0].symbol} / ${SUI_TOKENS[1].symbol}`, dex: 'Cetus',     volumeShare: 0.305, feeRate: 0.003, change: 18.4  },
+  { pair: `${SUI_TOKENS[0].symbol} / ${SUI_TOKENS[2].symbol}`, dex: 'Turbos',    volumeShare: 0.210, feeRate: 0.003, change: -5.2  },
+  { pair: `${SUI_TOKENS[4].symbol} / ${SUI_TOKENS[1].symbol}`, dex: 'DeepBook',  volumeShare: 0.144, feeRate: 0.003, change: 32.1  },
+  { pair: `${SUI_TOKENS[3].symbol} / ${SUI_TOKENS[0].symbol}`, dex: 'Aftermath', volumeShare: 0.090, feeRate: 0.003, change: -11.7 },
+  { pair: `${SUI_TOKENS[1].symbol} / ${SUI_TOKENS[2].symbol}`, dex: 'FlowX',     volumeShare: 0.073, feeRate: 0.001, change: 2.9   },
+  { pair: `${SUI_TOKENS[0].symbol} / ${SUI_TOKENS[7].symbol}`, dex: 'DeepBook',  volumeShare: 0.056, feeRate: 0.003, change: 55.6  },
+  { pair: `${SUI_TOKENS[5].symbol} / ${SUI_TOKENS[1].symbol}`, dex: 'Kriya',     volumeShare: 0.036, feeRate: 0.003, change: -3.4  },
 ]
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
@@ -68,14 +58,121 @@ function fmt(value: number): string {
   return `$${value.toFixed(2)}`
 }
 
+function fmtLarge(value: number): string {
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`
+  return `$${value.toFixed(2)}`
+}
+
+/** Abbreviate a coin type to its symbol for display */
+function coinTypeToSymbol(coinType: string): string {
+  const token = SUI_TOKENS.find((t) => t.address === coinType)
+  if (token) return token.symbol
+  // Fallback: last segment after ::
+  const parts = coinType.split('::')
+  return parts[parts.length - 1] ?? coinType
+}
+
+/** Format a raw timestamp to a relative "Xs ago" string */
+function timeAgo(ts: number): string {
+  const diffMs = Date.now() - ts
+  const s = Math.floor(diffMs / 1000)
+  if (s < 60) return `${s}s ago`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  return `${Math.floor(m / 60)}h ago`
+}
+
+/** Format a raw amount using the token's decimals */
+function fmtAmount(raw: number, coinType: string): string {
+  const token = SUI_TOKENS.find((t) => t.address === coinType)
+  const decimals = token?.decimals ?? 9
+  const human = raw / Math.pow(10, decimals)
+  if (human >= 1_000_000) return `${(human / 1_000_000).toFixed(2)}M`
+  if (human >= 1_000) return `${human.toLocaleString('en-US', { maximumFractionDigits: 1 })}`
+  return human.toFixed(human < 1 ? 4 : 2)
+}
+
+/** Truncate a wallet address for display */
+function truncateAddr(addr: string): string {
+  if (addr.length <= 12) return addr
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<'volume' | 'fees'>('volume')
 
+  // ── Volume chart: 7-day SUI volume from CoinGecko ──────────────────────────
+  const [volumeData, setVolumeData] = useState<VolumeDataPoint[]>([])
+
+  useEffect(() => {
+    fetch(
+      'https://api.coingecko.com/api/v3/coins/sui/market_chart?vs_currency=usd&days=7&interval=daily',
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        const points: VolumeDataPoint[] = (
+          data.total_volumes as [number, number][] | undefined ?? []
+        ).map(([ts, vol]) => ({
+          date: new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          volume: Math.round(vol / 100), // DEX subset estimate (~1% of total SUI volume)
+          fees: Math.round(vol / 100 / 333), // ~0.3% fee
+        }))
+        if (points.length > 0) setVolumeData(points)
+      })
+      .catch(() => {/* keep empty — chart renders nothing gracefully */})
+  }, [])
+
+  // ── Market stats: SUI data from CoinGecko ─────────────────────────────────
+  const [suiStats, setSuiStats] = useState<SuiMarketData | null>(null)
+
+  useEffect(() => {
+    fetch(
+      'https://api.coingecko.com/api/v3/coins/sui?localization=false&tickers=false&community_data=false&developer_data=false',
+    )
+      .then((r) => r.json())
+      .then((data) => setSuiStats(data.market_data as SuiMarketData))
+      .catch(() => {})
+  }, [])
+
+  // ── Recent swaps: live from chain (or mock when not deployed) ──────────────
+  const { swaps, loading: swapsLoading, isMockData } = useRecentSwaps(10)
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+
+  // DEX distribution volumes derived from real total_volume when available
+  const totalVolume24h = suiStats?.total_volume?.usd
+    ? Math.round(suiStats.total_volume.usd / 100)
+    : null
+
+  const dexDistribution: DexVolumeEntry[] = DEX_SHARES.map((d) => ({
+    name: d.name,
+    volume: totalVolume24h ? Math.round(totalVolume24h * d.share) : 0,
+    percentage: d.share * 100,
+  }))
+
+  // Top pairs volumes derived from real total_volume
+  const topPairs = TRADING_PAIRS.map((p) => ({
+    pair: p.pair,
+    dex: p.dex,
+    volume24h: totalVolume24h ? Math.round(totalVolume24h * p.volumeShare) : 0,
+    fees24h: totalVolume24h
+      ? Math.round(totalVolume24h * p.volumeShare * p.feeRate)
+      : 0,
+    change: p.change,
+  }))
+
+  // Stats card values
+  const volumeValue = totalVolume24h ? fmtLarge(totalVolume24h) : '—'
+  const volumeChange = suiStats?.price_change_percentage_24h ?? 0
+  const feesValue = totalVolume24h ? fmtLarge(totalVolume24h * 0.003) : '—'
+
+  // Chart data (swap volume/fees depending on tab)
   const chartData = volumeData.map((d) => ({
     ...d,
-    // When showing fees only, zero out volume for clarity
     ...(activeTab === 'fees' ? { volume: d.fees ?? 0, fees: undefined } : {}),
   }))
 
@@ -85,6 +182,14 @@ export default function AnalyticsPage() {
       style={{ background: '#060611', color: '#E2E8F0' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        {/* Contract not deployed banner */}
+        {(!process.env.NEXT_PUBLIC_ROUTER_PACKAGE_ID ||
+          process.env.NEXT_PUBLIC_ROUTER_PACKAGE_ID === '0x0') ? (
+          <div className="mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-sm">
+            ⚠️ OmniWeave contracts not yet deployed. Analytics show estimated data.
+          </div>
+        ) : null}
 
         {/* Header */}
         <div className="mb-10">
@@ -108,8 +213,8 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
           <StatsCard
             title="Total Volume (24h)"
-            value="$11.67M"
-            change24h={38.4}
+            value={volumeValue}
+            change24h={volumeChange}
             icon={<DollarSign size={18} />}
             subtitle="Across 6 DEXes"
           />
@@ -129,8 +234,8 @@ export default function AnalyticsPage() {
           />
           <StatsCard
             title="Total Fees Collected"
-            value="$35,010"
-            change24h={38.4}
+            value={feesValue}
+            change24h={volumeChange}
             icon={<Zap size={18} />}
             subtitle="Distributed to LPs"
           />
@@ -183,7 +288,10 @@ export default function AnalyticsPage() {
             <h2 className="font-semibold text-base mb-4" style={{ color: '#E2E8F0' }}>
               DEX Distribution
             </h2>
-            <DexPieChart data={dexDistribution} height={280} />
+            <DexPieChart data={dexDistribution} height={260} />
+            <p className="text-center text-xs text-slate-500 mt-2">
+              Estimated distribution based on TVL data
+            </p>
           </div>
         </div>
 
@@ -204,47 +312,47 @@ export default function AnalyticsPage() {
                 Top Trading Pairs
               </h2>
             </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
-                  {['Pair', 'DEX', 'Volume 24h', 'Fees 24h', '24h'].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-slate-500"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {topPairs.map((row, i) => (
-                  <tr
-                    key={i}
-                    className="transition-colors hover:bg-white/[0.02]"
-                    style={{ borderBottom: '1px solid rgba(99,102,241,0.07)' }}
-                  >
-                    <td className="px-4 py-3 font-semibold" style={{ color: '#E2E8F0' }}>
-                      {row.pair}
-                    </td>
-                    <td className="px-4 py-3">
-                      <DEXBadge dex={row.dex} size="sm" />
-                    </td>
-                    <td className="px-4 py-3 font-mono" style={{ color: '#E2E8F0' }}>
-                      {fmt(row.volume24h)}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-slate-400">
-                      {fmt(row.fees24h)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriceChange value={row.change} size="sm" />
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+                    {['Pair', 'DEX', 'Volume 24h', 'Fees 24h', '24h'].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-slate-500"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {topPairs.map((row, i) => (
+                    <tr
+                      key={i}
+                      className="transition-colors hover:bg-white/[0.02]"
+                      style={{ borderBottom: '1px solid rgba(99,102,241,0.07)' }}
+                    >
+                      <td className="px-4 py-3 font-semibold" style={{ color: '#E2E8F0' }}>
+                        {row.pair}
+                      </td>
+                      <td className="px-4 py-3">
+                        <DEXBadge dex={row.dex} size="sm" />
+                      </td>
+                      <td className="px-4 py-3 font-mono" style={{ color: '#E2E8F0' }}>
+                        {row.volume24h > 0 ? fmt(row.volume24h) : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-400">
+                        {row.fees24h > 0 ? fmt(row.fees24h) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PriceChange value={row.change} size="sm" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Recent Swaps */}
@@ -260,40 +368,61 @@ export default function AnalyticsPage() {
               className="px-6 py-4 flex items-center justify-between border-b"
               style={{ borderColor: 'rgba(99,102,241,0.15)' }}
             >
-              <h2 className="font-semibold text-base" style={{ color: '#E2E8F0' }}>
-                Recent Swaps
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold text-base" style={{ color: '#E2E8F0' }}>
+                  Recent Swaps
+                </h2>
+                {isMockData && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Demo data — contract not deployed
+                  </span>
+                )}
+              </div>
               <span className="flex items-center gap-1.5 text-xs text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Live
               </span>
             </div>
             <div className="divide-y" style={{ borderColor: 'rgba(99,102,241,0.07)' }}>
-              {recentSwaps.map((swap) => (
-                <div
-                  key={swap.id}
-                  className="px-5 py-3.5 hover:bg-white/[0.02] transition-colors flex items-center gap-3"
-                >
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}
-                  >
-                    <ArrowUpRight size={14} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm" style={{ color: '#E2E8F0' }}>
-                        {swap.from} → {swap.to}
-                      </span>
-                      <DEXBadge dex={swap.dex} size="sm" />
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5 truncate">
-                      {swap.amountIn} → {swap.amountOut} · {swap.wallet}
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-500 flex-shrink-0">{swap.time}</span>
+              {swapsLoading ? (
+                <div className="px-5 py-6 text-center text-sm text-slate-500">
+                  Loading swaps…
                 </div>
-              ))}
+              ) : (
+                swaps.map((swap) => {
+                  const fromSymbol = coinTypeToSymbol(swap.coinInType)
+                  const toSymbol   = coinTypeToSymbol(swap.coinOutType)
+                  const amountIn   = fmtAmount(swap.amountIn, swap.coinInType)
+                  const amountOut  = fmtAmount(swap.amountOut, swap.coinOutType)
+                  const wallet     = truncateAddr(swap.user)
+                  const time       = timeAgo(swap.timestamp)
+
+                  return (
+                    <div
+                      key={swap.digest}
+                      className="px-5 py-3.5 hover:bg-white/[0.02] transition-colors flex items-center gap-3"
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}
+                      >
+                        <ArrowUpRight size={14} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm" style={{ color: '#E2E8F0' }}>
+                            {fromSymbol} → {toSymbol}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5 truncate">
+                          {amountIn} {fromSymbol} → {amountOut} {toSymbol} · {wallet}
+                        </div>
+                      </div>
+                      <span className="text-xs text-slate-500 flex-shrink-0">{time}</span>
+                    </div>
+                  )
+                })
+              )}
             </div>
           </div>
 

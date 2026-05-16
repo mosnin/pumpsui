@@ -10,7 +10,7 @@ import {
   expiryFromDays,
   POOLS,
 } from '@/lib/deepbook'
-import { useSuiClient } from '@mysten/dapp-kit'
+import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,6 +132,8 @@ interface LimitOrderCardProps {
 
 export function LimitOrderCard({ onOrderPlaced }: LimitOrderCardProps) {
   const client = useSuiClient()
+  const account = useCurrentAccount()
+  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction()
 
   const [side, setSide] = useState<Side>('buy')
   const [triggerPrice, setTriggerPrice] = useState('')
@@ -139,9 +141,15 @@ export function LimitOrderCard({ onOrderPlaced }: LimitOrderCardProps) {
   const [expiry, setExpiry] = useState<ExpiryOption>('7D')
   const [orderBook, setOrderBook] = useState<OrderBook | null>(null)
   const [placing, setPlacing] = useState(false)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string; digest?: string } | null>(null)
 
   const pool = POOLS['SUI/USDC']
+
+  // AccountCap: users must create one before placing limit orders.
+  // We derive a placeholder — in a full integration the Cap object ID
+  // would be looked up from the user's owned objects.
+  const accountCapId = '0x0'
+  const hasAccountCap = accountCapId !== '0x0'
 
   // Load order book on mount + refresh every 15 s
   useEffect(() => {
@@ -178,10 +186,15 @@ export function LimitOrderCard({ onOrderPlaced }: LimitOrderCardProps) {
     if (val === '' || /^\d*\.?\d*$/.test(val)) setTriggerPrice(val)
   }, [])
 
-  const canPlace = !!triggerPrice && !!amount && parseFloat(triggerPrice) > 0 && parseFloat(amount) > 0
+  const canPlace =
+    !!account &&
+    !!triggerPrice &&
+    !!amount &&
+    parseFloat(triggerPrice) > 0 &&
+    parseFloat(amount) > 0
 
   const handlePlace = useCallback(async () => {
-    if (!canPlace) return
+    if (!canPlace || !account) return
     setPlacing(true)
     setFeedback(null)
 
@@ -190,23 +203,23 @@ export function LimitOrderCard({ onOrderPlaced }: LimitOrderCardProps) {
       const quantity = quantityToDeepBook(parseFloat(amount))
       const expireTs = expiryFromDays(EXPIRY_DAYS[expiry])
 
-      // NOTE: accountCapId must come from the connected wallet in production.
-      // Here we build the TX and show the user they need a wallet.
-      const _tx = buildPlaceLimitOrderTx({
+      const tx = buildPlaceLimitOrderTx({
         poolId: pool.id,
         price,
         quantity,
         isBid: side === 'buy',
         expireTimestamp: expireTs,
-        accountCapId: '0x0', // placeholder — wallet integration sets this
+        accountCapId,
       })
 
-      // In a fully integrated app, execute via signAndExecuteTransactionBlock.
-      // For now, simulate success after 1 s.
-      await new Promise((r) => setTimeout(r, 900))
-      const mockDigest = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
-      setFeedback({ type: 'success', msg: `Order placed! Digest: ${mockDigest.slice(0, 20)}…` })
-      onOrderPlaced?.(mockDigest)
+      // @ts-expect-error version skew between @mysten/sui and dapp-kit bundled copy
+      const result = await signAndExecute({ transaction: tx })
+      setFeedback({
+        type: 'success',
+        msg: `Order placed! Tx: ${result.digest.slice(0, 20)}…`,
+        digest: result.digest,
+      })
+      onOrderPlaced?.(result.digest)
       setAmount('')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to place order'
@@ -214,7 +227,7 @@ export function LimitOrderCard({ onOrderPlaced }: LimitOrderCardProps) {
     } finally {
       setPlacing(false)
     }
-  }, [canPlace, triggerPrice, amount, expiry, side, pool.id, onOrderPlaced])
+  }, [canPlace, account, triggerPrice, amount, expiry, side, pool.id, accountCapId, signAndExecute, onOrderPlaced])
 
   return (
     <div className="flex flex-col gap-4">
@@ -329,6 +342,25 @@ export function LimitOrderCard({ onOrderPlaced }: LimitOrderCardProps) {
         </div>
       </div>
 
+      {/* Wallet / AccountCap warnings */}
+      {!account && (
+        <div
+          className="text-xs p-2 rounded"
+          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#818CF8' }}
+        >
+          Connect your wallet to place limit orders.
+        </div>
+      )}
+      {account && !hasAccountCap && (
+        <div
+          className="text-xs p-2 rounded"
+          style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#FBBF24' }}
+        >
+          You need a DeepBook AccountCap to place limit orders.
+          Create one to get started.
+        </div>
+      )}
+
       {/* Order summary */}
       {canPlace && (
         <div
@@ -388,6 +420,8 @@ export function LimitOrderCard({ onOrderPlaced }: LimitOrderCardProps) {
             </svg>
             Placing Order…
           </span>
+        ) : !account ? (
+          'Connect wallet to place order'
         ) : !canPlace ? (
           'Enter price and amount'
         ) : (

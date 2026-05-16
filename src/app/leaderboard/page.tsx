@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Trophy, Zap, Activity, TrendingUp, TrendingDown, Crown } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Trophy, Zap, Activity, TrendingUp, TrendingDown, Crown, ExternalLink } from 'lucide-react'
+import { useRecentSwaps } from '@/hooks/useSuiEvents'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +14,6 @@ interface Trader {
   displayAddress: string
   volume: number
   trades: number
-  pnl: number // percent
 }
 
 interface BigSwap {
@@ -36,20 +36,7 @@ interface ActiveTrader {
   avgSwapSize: number
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_TRADERS: Trader[] = [
-  { rank: 1, address: '0x3f4a9e2d1b7c8f5e6a0d3c2b1a9e8f7d6c5b4a3e', displayAddress: '0x3f4a…2d9e', volume: 4_250_000, trades: 847, pnl: 34.7 },
-  { rank: 2, address: '0x7b2c1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4', displayAddress: '0x7b2c…5b4a', volume: 3_180_000, trades: 612, pnl: 12.4 },
-  { rank: 3, address: '0xa1d34c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2', displayAddress: '0xa1d3…f3e2', volume: 2_940_000, trades: 1_024, pnl: -5.8 },
-  { rank: 4, address: '0x2e9f7a1c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1', displayAddress: '0x2e9f…a2f1', volume: 2_410_000, trades: 389, pnl: 28.1 },
-  { rank: 5, address: '0xd4b73e5a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7', displayAddress: '0xd4b7…8d7c', volume: 1_870_000, trades: 521, pnl: 9.3 },
-  { rank: 6, address: '0x8f1e2b6d5c4a3f2e1d0c9b8a7f6e5d4c3b2a1f0', displayAddress: '0x8f1e…1f0e', volume: 1_640_000, trades: 276, pnl: -12.6 },
-  { rank: 7, address: '0x5c3a9d4f2e1b0a9f8e7d6c5b4a3f2e1d0c9b8a7', displayAddress: '0x5c3a…b8a7', volume: 1_320_000, trades: 433, pnl: 51.2 },
-  { rank: 8, address: '0x1b4d7a2f9e8c3b0a5f6e7d8c9b0a1f2e3d4c5b6', displayAddress: '0x1b4d…5b6a', volume: 1_080_000, trades: 198, pnl: 6.7 },
-  { rank: 9, address: '0x9c2e5a8f1b4d7e0c3f6a9b2e5c8f1b4d7e0c3f6', displayAddress: '0x9c2e…3f6a', volume: 890_000,   trades: 312, pnl: -3.1 },
-  { rank: 10, address: '0x4f7a0d3e6b9c2f5a8e1b4d7a0c3f6a9b2e5c8f1', displayAddress: '0x4f7a…8f1b', volume: 720_000,   trades: 157, pnl: 18.9 },
-]
+// ─── Mock fallback for Biggest Swaps (no real source yet) ─────────────────────
 
 const MOCK_BIGGEST_SWAPS: BigSwap[] = [
   { rank: 1, txHash: '0x1a2b',  from: 'WBTC',  to: 'USDC',  amountUsd: 2_840_000, wallet: '0x3f4a…2d9e', time: '4h ago',  dex: 'DeepBook' },
@@ -59,16 +46,6 @@ const MOCK_BIGGEST_SWAPS: BigSwap[] = [
   { rank: 5, txHash: '0x9c0d',  from: 'SUI',   to: 'ETH',   amountUsd: 760_000,   wallet: '0xd4b7…8d7c', time: '14h ago', dex: 'Aftermath'},
   { rank: 6, txHash: '0xb2e3',  from: 'USDT',  to: 'SUI',   amountUsd: 620_000,   wallet: '0x8f1e…1f0e', time: '16h ago', dex: 'FlowX'    },
   { rank: 7, txHash: '0xd4f5',  from: 'CETUS', to: 'USDC',  amountUsd: 480_000,   wallet: '0x5c3a…b8a7', time: '19h ago', dex: 'Cetus'    },
-]
-
-const MOCK_ACTIVE: ActiveTrader[] = [
-  { rank: 1, address: '0xa1d34c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2', displayAddress: '0xa1d3…f3e2', trades: 1_024, volume: 2_940_000, avgSwapSize: 2_871 },
-  { rank: 2, address: '0x3f4a9e2d1b7c8f5e6a0d3c2b1a9e8f7d6c5b4a3e', displayAddress: '0x3f4a…2d9e', trades: 847,   volume: 4_250_000, avgSwapSize: 5_018 },
-  { rank: 3, address: '0x7b2c1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4', displayAddress: '0x7b2c…5b4a', trades: 612,   volume: 3_180_000, avgSwapSize: 5_196 },
-  { rank: 4, address: '0xd4b73e5a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7', displayAddress: '0xd4b7…8d7c', trades: 521,   volume: 1_870_000, avgSwapSize: 3_589 },
-  { rank: 5, address: '0x8f1e2b6d5c4a3f2e1d0c9b8a7f6e5d4c3b2a1f0', displayAddress: '0x8f1e…1f0e', trades: 433,   volume: 1_640_000, avgSwapSize: 3_787 },
-  { rank: 6, address: '0x5c3a9d4f2e1b0a9f8e7d6c5b4a3f2e1d0c9b8a7', displayAddress: '0x5c3a…b8a7', trades: 389,   volume: 2_410_000, avgSwapSize: 6_195 },
-  { rank: 7, address: '0x9c2e5a8f1b4d7e0c3f6a9b2e5c8f1b4d7e0c3f6', displayAddress: '0x9c2e…3f6a', trades: 312,   volume: 890_000,   avgSwapSize: 2_853 },
 ]
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
@@ -82,6 +59,11 @@ function fmtUSD(v: number): string {
 function fmtNum(v: number): string {
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`
   return v.toString()
+}
+
+function shortenAddress(addr: string): string {
+  if (addr.length <= 12) return addr
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
 // ─── Rank Medal ───────────────────────────────────────────────────────────────
@@ -112,6 +94,44 @@ function RankBadge({ rank }: { rank: number }) {
     >
       {rank}
     </span>
+  )
+}
+
+// ─── Demo data banner ─────────────────────────────────────────────────────────
+
+function MockDataBanner() {
+  return (
+    <div
+      className="mb-6 flex items-start gap-3 rounded-xl border px-4 py-3"
+      style={{
+        background: 'rgba(245,158,11,0.07)',
+        borderColor: 'rgba(245,158,11,0.25)',
+      }}
+    >
+      <span className="text-amber-400 text-base leading-none mt-0.5">⚠</span>
+      <p className="text-sm text-amber-300/90">
+        Showing demo data — real data loads after contract deployment
+      </p>
+    </div>
+  )
+}
+
+// ─── Suiscan link ─────────────────────────────────────────────────────────────
+
+function SuiscanLink({ address }: { address: string }) {
+  return (
+    <a
+      href={`https://suiscan.xyz/mainnet/account/${address}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
+      title="View on Suiscan"
+    >
+      <span className="font-mono font-medium" style={{ color: '#A5B4FC' }}>
+        {shortenAddress(address)}
+      </span>
+      <ExternalLink size={11} style={{ color: '#A5B4FC' }} />
+    </a>
   )
 }
 
@@ -169,7 +189,7 @@ function Top3Cards({ traders }: { traders: Trader[] }) {
               </div>
               <div>
                 <div className="font-mono text-sm font-semibold" style={{ color: '#E2E8F0' }}>
-                  {trader.displayAddress}
+                  <SuiscanLink address={trader.address} />
                 </div>
                 <div className="text-xs text-slate-500">#{trader.rank} Trader</div>
               </div>
@@ -186,17 +206,6 @@ function Top3Cards({ traders }: { traders: Trader[] }) {
                 <span className="text-slate-400">Trades</span>
                 <span className="font-semibold font-mono" style={{ color: '#E2E8F0' }}>
                   {fmtNum(trader.trades)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">PnL</span>
-                <span
-                  className={`font-semibold flex items-center gap-1 ${
-                    trader.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}
-                >
-                  {trader.pnl >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  {trader.pnl >= 0 ? '+' : ''}{trader.pnl.toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -289,6 +298,45 @@ export default function LeaderboardPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7D')
   const [activeSection, setActiveSection] = useState<'top' | 'swaps' | 'active'>('top')
 
+  // ── Real swap data ─────────────────────────────────────────────────────────
+  const { swaps, isMockData } = useRecentSwaps(50)
+
+  // Aggregate by user address to derive volume and trade count leaderboard
+  const traders = useMemo<Trader[]>(() => {
+    const map = new Map<string, { volume: number; trades: number; address: string }>()
+    swaps.forEach((s) => {
+      const existing = map.get(s.user) ?? { volume: 0, trades: 0, address: s.user }
+      map.set(s.user, {
+        ...existing,
+        volume: existing.volume + s.amountIn,
+        trades: existing.trades + 1,
+      })
+    })
+    return Array.from(map.values())
+      .sort((a, b) => b.volume - a.volume)
+      .map((t, i) => ({
+        rank: i + 1,
+        address: t.address,
+        displayAddress: shortenAddress(t.address),
+        volume: t.volume,
+        trades: t.trades,
+      }))
+  }, [swaps])
+
+  // Most-active: sort by trade count instead
+  const activeTraders = useMemo<ActiveTrader[]>(() => {
+    return [...traders]
+      .sort((a, b) => b.trades - a.trades)
+      .map((t, i) => ({
+        rank: i + 1,
+        address: t.address,
+        displayAddress: t.displayAddress,
+        trades: t.trades,
+        volume: t.volume,
+        avgSwapSize: t.trades > 0 ? t.volume / t.trades : 0,
+      }))
+  }, [traders])
+
   const sections = [
     { id: 'top' as const,    label: 'Top Traders',   icon: <Trophy size={15} /> },
     { id: 'swaps' as const,  label: 'Biggest Swaps', icon: <Zap size={15} /> },
@@ -320,6 +368,9 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
+        {/* Demo data banner */}
+        {isMockData && <MockDataBanner />}
+
         {/* Section tabs */}
         <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1">
           {sections.map(({ id, label, icon }) => (
@@ -350,9 +401,12 @@ export default function LeaderboardPage() {
         {/* ── Top Traders ─────────────────────────────────────────────────── */}
         {activeSection === 'top' && (
           <>
-            <Top3Cards traders={MOCK_TRADERS} />
+            {traders.length >= 3 && <Top3Cards traders={traders} />}
 
-            <Panel title="Top Traders" icon={<Trophy size={15} />}>
+            <Panel
+              title={`Top Traders${isMockData ? ' (Estimated)' : ''}`}
+              icon={<Trophy size={15} />}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -361,16 +415,15 @@ export default function LeaderboardPage() {
                       <TH>Trader</TH>
                       <TH right>Volume</TH>
                       <TH right>Trades</TH>
-                      <TH right>PnL</TH>
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_TRADERS.map((trader, i) => (
+                    {traders.map((trader, i) => (
                       <tr
                         key={trader.address}
                         className="transition-colors hover:bg-white/[0.025]"
                         style={{
-                          borderBottom: i < MOCK_TRADERS.length - 1
+                          borderBottom: i < traders.length - 1
                             ? '1px solid rgba(99,102,241,0.07)'
                             : 'none',
                         }}
@@ -378,8 +431,8 @@ export default function LeaderboardPage() {
                         <td className="px-4 py-3.5">
                           <RankBadge rank={trader.rank} />
                         </td>
-                        <td className="px-4 py-3.5 font-mono font-medium" style={{ color: '#A5B4FC' }}>
-                          {trader.displayAddress}
+                        <td className="px-4 py-3.5">
+                          <SuiscanLink address={trader.address} />
                         </td>
                         <td className="px-4 py-3.5 text-right font-mono font-semibold" style={{ color: '#E2E8F0' }}>
                           {fmtUSD(trader.volume)}
@@ -387,18 +440,15 @@ export default function LeaderboardPage() {
                         <td className="px-4 py-3.5 text-right font-mono text-slate-300">
                           {fmtNum(trader.trades)}
                         </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <span
-                            className={`inline-flex items-center gap-1 font-semibold text-sm ${
-                              trader.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'
-                            }`}
-                          >
-                            {trader.pnl >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-                            {trader.pnl >= 0 ? '+' : ''}{trader.pnl.toFixed(1)}%
-                          </span>
-                        </td>
                       </tr>
                     ))}
+                    {traders.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-slate-500 text-sm">
+                          No swap data available yet.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -441,7 +491,7 @@ export default function LeaderboardPage() {
 
         {/* ── Biggest Swaps ────────────────────────────────────────────────── */}
         {activeSection === 'swaps' && (
-          <Panel title="Biggest Swaps (24H)" icon={<Zap size={15} />}>
+          <Panel title="Biggest Swaps (24H) — Estimated" icon={<Zap size={15} />}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -508,7 +558,10 @@ export default function LeaderboardPage() {
 
         {/* ── Most Active ──────────────────────────────────────────────────── */}
         {activeSection === 'active' && (
-          <Panel title="Most Active Traders" icon={<Activity size={15} />}>
+          <Panel
+            title={`Most Active Traders${isMockData ? ' (Estimated)' : ''}`}
+            icon={<Activity size={15} />}
+          >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -521,12 +574,12 @@ export default function LeaderboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_ACTIVE.map((trader, i) => (
+                  {activeTraders.map((trader, i) => (
                     <tr
                       key={trader.address}
                       className="transition-colors hover:bg-white/[0.025]"
                       style={{
-                        borderBottom: i < MOCK_ACTIVE.length - 1
+                        borderBottom: i < activeTraders.length - 1
                           ? '1px solid rgba(99,102,241,0.07)'
                           : 'none',
                       }}
@@ -534,8 +587,8 @@ export default function LeaderboardPage() {
                       <td className="px-4 py-3.5">
                         <RankBadge rank={trader.rank} />
                       </td>
-                      <td className="px-4 py-3.5 font-mono font-medium" style={{ color: '#A5B4FC' }}>
-                        {trader.displayAddress}
+                      <td className="px-4 py-3.5">
+                        <SuiscanLink address={trader.address} />
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <span
@@ -553,6 +606,13 @@ export default function LeaderboardPage() {
                       </td>
                     </tr>
                   ))}
+                  {activeTraders.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-500 text-sm">
+                        No swap data available yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

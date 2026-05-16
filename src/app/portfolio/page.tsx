@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useCallback, useState } from 'react'
 import {
   Wallet,
   TrendingUp,
@@ -10,53 +10,27 @@ import {
   ArrowRightLeft,
   ChevronRight,
   BarChart2,
+  CheckCircle2,
 } from 'lucide-react'
+import { useCurrentAccount, useSuiClientQuery } from '@mysten/dapp-kit'
 import { DEXBadge } from '@/components/common/DEXBadge'
 import { PriceChange } from '@/components/common/PriceChange'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { SUI_TOKENS } from '@/lib/tokens'
+import { useRecentSwaps } from '@/hooks/useSuiEvents'
+import { useTokenPrices } from '@/hooks/useTokenPrices'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface TokenBalance {
   symbol: string
   name: string
+  address: string
+  logoURI: string
   amount: number
   price: number
   change24h: number
-  iconColor: string
 }
-
-interface SwapHistory {
-  txHash: string
-  time: string
-  fromToken: string
-  toToken: string
-  fromAmount: string
-  toAmount: string
-  dex: string
-  status: 'success' | 'failed'
-  usdValue: number
-}
-
-// ─── Mock Data ───────────────────────────────────────────────────────────────
-
-const MOCK_BALANCES: TokenBalance[] = [
-  { symbol: 'SUI',   name: 'Sui',          amount: 4_821.34,  price: 2.88,    change24h: 5.2,   iconColor: '#3B82F6' },
-  { symbol: 'USDC',  name: 'USD Coin',     amount: 3_200.00,  price: 1.00,    change24h: 0.01,  iconColor: '#2563EB' },
-  { symbol: 'WBTC',  name: 'Wrapped BTC',  amount: 0.1812,    price: 61_400,  change24h: -2.1,  iconColor: '#F59E0B' },
-  { symbol: 'ETH',   name: 'Ethereum',     amount: 1.4400,    price: 3_180,   change24h: 1.7,   iconColor: '#8B5CF6' },
-  { symbol: 'CETUS', name: 'Cetus Protocol',amount: 12_450,   price: 0.082,   change24h: 11.4,  iconColor: '#00D4AA' },
-  { symbol: 'BUCK',  name: 'Buck Stablecoin',amount: 800,     price: 0.998,   change24h: -0.05, iconColor: '#10B981' },
-]
-
-const MOCK_SWAPS: SwapHistory[] = [
-  { txHash: '0x1a2b3c',   time: '2h ago',   fromToken: 'SUI',  toToken: 'USDC',  fromAmount: '500 SUI',   toAmount: '1,438.5 USDC',  dex: 'Cetus',     status: 'success', usdValue: 1438.50 },
-  { txHash: '0x4d5e6f',   time: '5h ago',   fromToken: 'USDC', toToken: 'WBTC',  fromAmount: '5,000 USDC',toAmount: '0.0814 WBTC',   dex: 'DeepBook',  status: 'success', usdValue: 5000.00 },
-  { txHash: '0x7a8b9c',   time: '1d ago',   fromToken: 'ETH',  toToken: 'SUI',   fromAmount: '0.5 ETH',   toAmount: '554.2 SUI',     dex: 'Aftermath', status: 'success', usdValue: 1590.00 },
-  { txHash: '0xd0e1f2',   time: '1d ago',   fromToken: 'SUI',  toToken: 'CETUS', fromAmount: '1,000 SUI', toAmount: '34,890 CETUS',  dex: 'Cetus',     status: 'failed',  usdValue: 2880.00 },
-  { txHash: '0x3f4a5b',   time: '2d ago',   fromToken: 'USDC', toToken: 'ETH',   fromAmount: '3,000 USDC',toAmount: '0.942 ETH',     dex: 'Turbos',    status: 'success', usdValue: 3000.00 },
-  { txHash: '0x6c7d8e',   time: '3d ago',   fromToken: 'SUI',  toToken: 'BUCK',  fromAmount: '280 SUI',   toAmount: '805.0 BUCK',    dex: 'Kriya',     status: 'success', usdValue: 806.40 },
-  { txHash: '0x9f0a1b',   time: '5d ago',   fromToken: 'WBTC', toToken: 'USDC',  fromAmount: '0.1 WBTC',  toAmount: '6,130.5 USDC',  dex: 'DeepBook',  status: 'success', usdValue: 6130.50 },
-]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -71,6 +45,45 @@ function fmtNum(n: number, decimals = 2): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(decimals)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(decimals)}K`
   return n.toFixed(Math.min(decimals, 6))
+}
+
+function timeAgo(timestampMs: number): string {
+  const diff = Date.now() - timestampMs
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function tokenSymbol(coinType: string): string {
+  const token = SUI_TOKENS.find((t) => t.address === coinType)
+  if (token) return token.symbol
+  // Fallback: extract last segment after '::'
+  const parts = coinType.split('::')
+  return parts[parts.length - 1] ?? coinType.slice(0, 6)
+}
+
+function tokenDecimals(coinType: string): number {
+  return SUI_TOKENS.find((t) => t.address === coinType)?.decimals ?? 9
+}
+
+function tokenIconColor(symbol: string): string {
+  const colors: Record<string, string> = {
+    SUI: '#3B82F6',
+    USDC: '#2563EB',
+    USDT: '#26A17B',
+    WETH: '#8B5CF6',
+    WBTC: '#F59E0B',
+    CETUS: '#00D4AA',
+    TURBOS: '#EF4444',
+    DEEP: '#06B6D4',
+    AFT: '#6366F1',
+    NAVX: '#F97316',
+  }
+  return colors[symbol] ?? '#6366F1'
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -94,42 +107,116 @@ function ConnectWalletCTA() {
       <p className="text-slate-400 max-w-sm mb-8">
         Connect your Sui wallet to view your token balances, swap history, and portfolio analytics.
       </p>
-      <button
-        className="px-8 py-3 rounded-xl font-semibold text-sm transition-all hover:opacity-90 active:scale-95"
-        style={{
-          background: 'linear-gradient(135deg, #6366F1, #06B6D4)',
-          color: '#fff',
-        }}
-      >
-        Connect Wallet
-      </button>
     </div>
+  )
+}
+
+function LiveBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+      style={{
+        background: 'rgba(16,185,129,0.1)',
+        border: '1px solid rgba(16,185,129,0.25)',
+        color: '#10B981',
+      }}
+    >
+      <CheckCircle2 size={11} />
+      Live · Sui mainnet
+    </span>
   )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PortfolioPage() {
-  const [isConnected, setIsConnected] = useState(false)
+  const account = useCurrentAccount()
+  const isConnected = !!account
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const totalValue = MOCK_BALANCES.reduce((sum, b) => sum + b.amount * b.price, 0)
-  const totalChange = MOCK_BALANCES.reduce(
-    (sum, b) => sum + b.amount * b.price * (b.change24h / 100),
-    0,
+  // ── Balances ──────────────────────────────────────────────────────────────
+
+  const {
+    data: allBalances,
+    isLoading: balancesLoading,
+    refetch: refetchBalances,
+  } = useSuiClientQuery(
+    'getAllBalances',
+    { owner: account?.address ?? '' },
+    { enabled: isConnected, refetchInterval: 30_000 },
   )
-  const totalChangePercent = (totalChange / (totalValue - totalChange)) * 100
 
-  const gasSpent = 0.412 // SUI
-  const gasUsd = gasSpent * 2.88
+  // ── Derive coingecko IDs from owned tokens ────────────────────────────────
 
-  const successSwaps = MOCK_SWAPS.filter((s) => s.status === 'success')
-  const totalSwapVolume = successSwaps.reduce((s, sw) => s + sw.usdValue, 0)
+  const ownedCoingeckoIds = useMemo(() => {
+    if (!allBalances) return []
+    return allBalances
+      .map((b) => SUI_TOKENS.find((t) => t.address === b.coinType)?.coingeckoId)
+      .filter((id): id is string => Boolean(id))
+  }, [allBalances])
 
-  const handleRefresh = () => {
+  const { prices, refetch: refetchPrices } = useTokenPrices(
+    isConnected ? ownedCoingeckoIds : [],
+  )
+
+  // ── Map balances to display format ────────────────────────────────────────
+
+  const tokenBalances = useMemo((): TokenBalance[] => {
+    if (!allBalances) return []
+    return allBalances
+      .map((b) => {
+        const token = SUI_TOKENS.find((t) => t.address === b.coinType)
+        if (!token) return null
+        const amount = Number(b.totalBalance) / 10 ** token.decimals
+        if (amount === 0) return null
+        const price = token.coingeckoId ? (prices[token.coingeckoId] ?? 0) : 0
+        return {
+          symbol: token.symbol,
+          name: token.name,
+          address: b.coinType,
+          logoURI: token.logoURI,
+          amount,
+          price,
+          change24h: 0,
+        } satisfies TokenBalance
+      })
+      .filter((b): b is TokenBalance => b !== null)
+      .sort((a, b) => b.amount * b.price - a.amount * a.price)
+  }, [allBalances, prices])
+
+  // ── Swap history ──────────────────────────────────────────────────────────
+
+  const { swaps, isMockData, refresh: refreshSwaps } = useRecentSwaps(20)
+
+  const userSwaps = useMemo(() => {
+    if (isMockData) return swaps
+    return swaps.filter((s) => s.user === account?.address)
+  }, [swaps, isMockData, account?.address])
+
+  // ── Summary stats ─────────────────────────────────────────────────────────
+
+  const totalValue = useMemo(
+    () => tokenBalances.reduce((sum, b) => sum + b.amount * b.price, 0),
+    [tokenBalances],
+  )
+
+  const successSwapCount = useMemo(
+    () => (isMockData ? 0 : userSwaps.length),
+    [isMockData, userSwaps],
+  )
+
+  // ── Refresh handler ───────────────────────────────────────────────────────
+
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
-    setTimeout(() => setIsRefreshing(false), 1200)
-  }
+    try {
+      await Promise.all([refetchBalances(), refetchPrices(), refreshSwaps()])
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [refetchBalances, refetchPrices, refreshSwaps])
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -157,30 +244,20 @@ export default function PortfolioPage() {
             </p>
           </div>
 
-          {/* Connect / Disconnect toggle (demo) */}
-          <div className="flex items-center gap-3">
-            {isConnected && (
+          {isConnected && (
+            <div className="flex items-center gap-3">
+              <LiveBadge />
               <button
                 onClick={handleRefresh}
-                className="p-2 rounded-lg transition-all hover:opacity-80"
+                disabled={isRefreshing || balancesLoading}
+                className="p-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
                 style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}
                 title="Refresh"
               >
                 <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
-            )}
-            <button
-              onClick={() => setIsConnected((v) => !v)}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
-              style={
-                isConnected
-                  ? { background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }
-                  : { background: '#6366F1', color: '#fff' }
-              }
-            >
-              {isConnected ? 'Disconnect' : 'Connect Wallet'}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {!isConnected ? (
@@ -211,15 +288,19 @@ export default function PortfolioPage() {
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">
                   Total Portfolio Value
                 </p>
-                <p className="text-3xl font-bold mb-2" style={{ color: '#E2E8F0' }}>
-                  {fmt(totalValue)}
+                {balancesLoading ? (
+                  <div className="flex items-center gap-2 h-9">
+                    <LoadingSpinner size="sm" />
+                    <span className="text-slate-500 text-sm">Loading…</span>
+                  </div>
+                ) : (
+                  <p className="text-3xl font-bold mb-2" style={{ color: '#E2E8F0' }}>
+                    {totalValue > 0 ? fmt(totalValue) : '—'}
+                  </p>
+                )}
+                <p className="text-xs text-slate-500">
+                  {tokenBalances.length} asset{tokenBalances.length !== 1 ? 's' : ''} tracked
                 </p>
-                <div className="flex items-center gap-2">
-                  <PriceChange value={totalChangePercent} size="sm" />
-                  <span className="text-xs text-slate-500">
-                    ({totalChange >= 0 ? '+' : ''}{fmt(Math.abs(totalChange))}) today
-                  </span>
-                </div>
               </div>
 
               {/* Swap Volume */}
@@ -232,18 +313,20 @@ export default function PortfolioPage() {
                 }}
               >
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">
-                  Total Swap Volume
+                  Recent Swaps
                 </p>
                 <p className="text-3xl font-bold mb-2" style={{ color: '#E2E8F0' }}>
-                  {fmt(totalSwapVolume)}
+                  {isMockData ? '—' : userSwaps.length}
                 </p>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <ArrowRightLeft size={13} />
-                  {successSwaps.length} successful swaps
+                  {isMockData
+                    ? 'History pending contract deployment'
+                    : `${successSwapCount} swap${successSwapCount !== 1 ? 's' : ''} found`}
                 </div>
               </div>
 
-              {/* Gas Spent */}
+              {/* Wallet address */}
               <div
                 className="rounded-xl p-5"
                 style={{
@@ -253,14 +336,25 @@ export default function PortfolioPage() {
                 }}
               >
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">
-                  Gas Spent (All-time)
+                  Wallet
                 </p>
-                <p className="text-3xl font-bold mb-2" style={{ color: '#E2E8F0' }}>
-                  {gasSpent.toFixed(3)} SUI
+                <p
+                  className="text-sm font-mono font-semibold mb-2 truncate"
+                  style={{ color: '#E2E8F0' }}
+                  title={account.address}
+                >
+                  {account.address.slice(0, 6)}…{account.address.slice(-6)}
                 </p>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <Fuel size={13} />
-                  ≈ {fmt(gasUsd)} at current price
+                  <a
+                    href={`https://suiscan.xyz/mainnet/account/${account.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-slate-300 transition-colors"
+                  >
+                    View on Suiscan ↗
+                  </a>
                 </div>
               </div>
             </div>
@@ -281,96 +375,131 @@ export default function PortfolioPage() {
                 <h2 className="font-semibold" style={{ color: '#E2E8F0' }}>
                   Token Balances
                 </h2>
-                <span className="text-xs text-slate-500">{MOCK_BALANCES.length} assets</span>
+                <span className="text-xs text-slate-500">
+                  {balancesLoading ? 'Loading…' : `${tokenBalances.length} assets`}
+                </span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
-                      {['Token', 'Balance', 'Price', '24h', 'Value'].map((h) => (
-                        <th
-                          key={h}
-                          className={`px-5 py-3 text-xs font-medium uppercase tracking-wider text-slate-500 ${
-                            h === 'Token' ? 'text-left' : 'text-right'
-                          }`}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {MOCK_BALANCES.map((token, i) => {
-                      const value = token.amount * token.price
-                      const pct = (value / totalValue) * 100
-                      return (
-                        <tr
-                          key={token.symbol}
-                          className="hover:bg-white/[0.025] transition-colors"
-                          style={{
-                            borderBottom:
-                              i < MOCK_BALANCES.length - 1
-                                ? '1px solid rgba(99,102,241,0.07)'
-                                : 'none',
-                          }}
-                        >
-                          {/* Token */}
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                                style={{ background: token.iconColor }}
-                              >
-                                {token.symbol[0]}
-                              </div>
-                              <div>
-                                <div className="font-semibold" style={{ color: '#E2E8F0' }}>
-                                  {token.symbol}
-                                </div>
-                                <div className="text-xs text-slate-500">{token.name}</div>
-                              </div>
-                              {/* Allocation bar */}
-                              <div className="hidden sm:block ml-3 w-16">
-                                <div className="h-1 rounded-full bg-slate-800 overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full"
-                                    style={{
-                                      width: `${pct}%`,
-                                      background: token.iconColor,
-                                      opacity: 0.7,
+
+              {balancesLoading ? (
+                <div className="flex items-center justify-center gap-3 py-16 text-slate-500">
+                  <LoadingSpinner size="md" />
+                  <span className="text-sm">Fetching balances from Sui…</span>
+                </div>
+              ) : tokenBalances.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+                  <Wallet size={32} className="opacity-40" />
+                  <p className="text-sm">No recognised token balances found</p>
+                  <p className="text-xs text-slate-600">
+                    Only tokens in the SUI_TOKENS list are shown
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+                        {['Token', 'Balance', 'Price', 'Value'].map((h) => (
+                          <th
+                            key={h}
+                            className={`px-5 py-3 text-xs font-medium uppercase tracking-wider text-slate-500 ${
+                              h === 'Token' ? 'text-left' : 'text-right'
+                            }`}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tokenBalances.map((token, i) => {
+                        const value = token.amount * token.price
+                        const pct = totalValue > 0 ? (value / totalValue) * 100 : 0
+                        const color = tokenIconColor(token.symbol)
+                        return (
+                          <tr
+                            key={token.address}
+                            className="hover:bg-white/[0.025] transition-colors"
+                            style={{
+                              borderBottom:
+                                i < tokenBalances.length - 1
+                                  ? '1px solid rgba(99,102,241,0.07)'
+                                  : 'none',
+                            }}
+                          >
+                            {/* Token */}
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                {token.logoURI ? (
+                                  <img
+                                    src={token.logoURI}
+                                    alt={token.symbol}
+                                    width={32}
+                                    height={32}
+                                    className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                                    onError={(e) => {
+                                      const el = e.currentTarget as HTMLImageElement
+                                      el.style.display = 'none'
+                                      const next = el.nextElementSibling as HTMLElement | null
+                                      if (next) next.style.display = 'flex'
                                     }}
                                   />
+                                ) : null}
+                                <div
+                                  className="w-8 h-8 rounded-full items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                  style={{
+                                    background: color,
+                                    display: token.logoURI ? 'none' : 'flex',
+                                  }}
+                                >
+                                  {token.symbol[0]}
                                 </div>
-                                <span className="text-[10px] text-slate-600">{pct.toFixed(1)}%</span>
+                                <div>
+                                  <div className="font-semibold" style={{ color: '#E2E8F0' }}>
+                                    {token.symbol}
+                                  </div>
+                                  <div className="text-xs text-slate-500">{token.name}</div>
+                                </div>
+                                {/* Allocation bar */}
+                                <div className="hidden sm:block ml-3 w-16">
+                                  <div className="h-1 rounded-full bg-slate-800 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full"
+                                      style={{
+                                        width: `${pct}%`,
+                                        background: color,
+                                        opacity: 0.7,
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-[10px] text-slate-600">
+                                    {pct.toFixed(1)}%
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* Balance */}
-                          <td className="px-5 py-4 text-right font-mono" style={{ color: '#E2E8F0' }}>
-                            {fmtNum(token.amount, token.amount < 10 ? 4 : 2)}
-                          </td>
+                            {/* Balance */}
+                            <td className="px-5 py-4 text-right font-mono" style={{ color: '#E2E8F0' }}>
+                              {fmtNum(token.amount, token.amount < 10 ? 4 : 2)}
+                            </td>
 
-                          {/* Price */}
-                          <td className="px-5 py-4 text-right font-mono text-slate-400">
-                            {fmt(token.price)}
-                          </td>
+                            {/* Price */}
+                            <td className="px-5 py-4 text-right font-mono text-slate-400">
+                              {token.price > 0 ? fmt(token.price) : <span className="text-slate-600">—</span>}
+                            </td>
 
-                          {/* 24h */}
-                          <td className="px-5 py-4 text-right">
-                            <PriceChange value={token.change24h} size="sm" />
-                          </td>
-
-                          {/* Value */}
-                          <td className="px-5 py-4 text-right font-semibold font-mono" style={{ color: '#E2E8F0' }}>
-                            {fmt(value)}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            {/* Value */}
+                            <td className="px-5 py-4 text-right font-semibold font-mono" style={{ color: '#E2E8F0' }}>
+                              {value > 0 ? fmt(value) : <span className="text-slate-600">—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Swap History */}
@@ -386,112 +515,129 @@ export default function PortfolioPage() {
                 className="px-6 py-4 border-b flex items-center justify-between"
                 style={{ borderColor: 'rgba(99,102,241,0.15)' }}
               >
-                <h2 className="font-semibold" style={{ color: '#E2E8F0' }}>
-                  Recent Swap History
-                </h2>
-                <span className="text-xs text-slate-500">Last 7 days</span>
+                <div className="flex items-center gap-3">
+                  <h2 className="font-semibold" style={{ color: '#E2E8F0' }}>
+                    Recent Swap History
+                  </h2>
+                  {isMockData && (
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full"
+                      style={{
+                        background: 'rgba(245,158,11,0.1)',
+                        border: '1px solid rgba(245,158,11,0.2)',
+                        color: '#F59E0B',
+                      }}
+                    >
+                      Demo data
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-slate-500">
+                  {isMockData ? 'Contract not yet deployed' : `${userSwaps.length} swaps`}
+                </span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
-                      {['Swap', 'DEX', 'Amount In', 'Amount Out', 'USD Value', 'Time', 'Status', ''].map(
-                        (h, i) => (
+
+              {userSwaps.length === 0 && !isMockData ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+                  <ArrowRightLeft size={32} className="opacity-40" />
+                  <p className="text-sm">No swaps found for this wallet</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+                        {['Swap', 'Amount In', 'Amount Out', 'Time', 'Status', ''].map((h, i) => (
                           <th
                             key={i}
                             className={`px-5 py-3 text-xs font-medium uppercase tracking-wider text-slate-500 ${
-                              ['Swap', 'DEX'].includes(h) ? 'text-left' : 'text-right'
+                              h === 'Swap' ? 'text-left' : 'text-right'
                             }`}
                           >
                             {h}
                           </th>
-                        ),
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {MOCK_SWAPS.map((swap, i) => (
-                      <tr
-                        key={swap.txHash}
-                        className="hover:bg-white/[0.025] transition-colors"
-                        style={{
-                          borderBottom:
-                            i < MOCK_SWAPS.length - 1
-                              ? '1px solid rgba(99,102,241,0.07)'
-                              : 'none',
-                        }}
-                      >
-                        {/* Swap pair */}
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1">
-                              <span className="font-semibold" style={{ color: '#E2E8F0' }}>
-                                {swap.fromToken}
-                              </span>
-                              <ArrowRightLeft size={12} className="text-slate-600" />
-                              <span className="font-semibold" style={{ color: '#E2E8F0' }}>
-                                {swap.toToken}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* DEX */}
-                        <td className="px-5 py-4">
-                          <DEXBadge dex={swap.dex} size="sm" />
-                        </td>
-
-                        {/* From amount */}
-                        <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
-                          {swap.fromAmount}
-                        </td>
-
-                        {/* To amount */}
-                        <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
-                          {swap.toAmount}
-                        </td>
-
-                        {/* USD value */}
-                        <td className="px-5 py-4 text-right font-mono font-medium" style={{ color: '#E2E8F0' }}>
-                          {fmt(swap.usdValue)}
-                        </td>
-
-                        {/* Time */}
-                        <td className="px-5 py-4 text-right text-xs text-slate-500">
-                          {swap.time}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-5 py-4 text-right">
-                          {swap.status === 'success' ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                              <TrendingUp size={12} />
-                              Success
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
-                              <TrendingDown size={12} />
-                              Failed
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Explorer link */}
-                        <td className="px-5 py-4 text-right">
-                          <a
-                            href={`https://suiexplorer.com/txblock/${swap.txHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-slate-600 hover:text-slate-400 transition-colors"
-                          >
-                            <ChevronRight size={16} />
-                          </a>
-                        </td>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {userSwaps.map((swap, i) => {
+                        const inSymbol = tokenSymbol(swap.coinInType)
+                        const outSymbol = tokenSymbol(swap.coinOutType)
+                        const inDec = tokenDecimals(swap.coinInType)
+                        const outDec = tokenDecimals(swap.coinOutType)
+                        const inAmt = swap.amountIn / 10 ** inDec
+                        const outAmt = swap.amountOut / 10 ** outDec
+                        return (
+                          <tr
+                            key={swap.digest}
+                            className="hover:bg-white/[0.025] transition-colors"
+                            style={{
+                              borderBottom:
+                                i < userSwaps.length - 1
+                                  ? '1px solid rgba(99,102,241,0.07)'
+                                  : 'none',
+                            }}
+                          >
+                            {/* Swap pair */}
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold" style={{ color: '#E2E8F0' }}>
+                                  {inSymbol}
+                                </span>
+                                <ArrowRightLeft size={12} className="text-slate-600" />
+                                <span className="font-semibold" style={{ color: '#E2E8F0' }}>
+                                  {outSymbol}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Amount in */}
+                            <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
+                              {fmtNum(inAmt, inAmt < 10 ? 4 : 2)} {inSymbol}
+                            </td>
+
+                            {/* Amount out */}
+                            <td className="px-5 py-4 text-right font-mono text-slate-400 text-xs">
+                              {fmtNum(outAmt, outAmt < 10 ? 4 : 2)} {outSymbol}
+                            </td>
+
+                            {/* Time */}
+                            <td className="px-5 py-4 text-right text-xs text-slate-500">
+                              {timeAgo(swap.timestamp)}
+                            </td>
+
+                            {/* Status — swaps from chain are all confirmed */}
+                            <td className="px-5 py-4 text-right">
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+                                <TrendingUp size={12} />
+                                Success
+                              </span>
+                            </td>
+
+                            {/* Explorer link */}
+                            <td className="px-5 py-4 text-right">
+                              {swap.digest && !isMockData ? (
+                                <a
+                                  href={`https://suiscan.xyz/mainnet/tx/${swap.digest}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-slate-600 hover:text-slate-400 transition-colors"
+                                >
+                                  <ChevronRight size={16} />
+                                </a>
+                              ) : (
+                                <span className="text-slate-700">
+                                  <ChevronRight size={16} />
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
           </div>
