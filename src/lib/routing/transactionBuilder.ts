@@ -56,6 +56,8 @@ export interface ProtocolObjects {
  * @param protocol       - Protocol config/treasury object IDs (optional)
  * @returns A fully-constructed Transaction ready to sign and submit
  */
+const PACKAGE_ID = process.env.NEXT_PUBLIC_ROUTER_PACKAGE_ID ?? ''
+
 export function buildAggregatedSwapTx(
   quote: QuoteResult,
   coinIn: string,
@@ -95,17 +97,19 @@ export function buildSingleSwapTx(
 ): Transaction {
   const txb = new Transaction()
 
-  // Split exact amount from the input coin object
+  // 1. Split exact amount from the input coin object
   const [exactCoin] = txb.splitCoins(txb.object(coinIn), [
     txb.pure.u64(route.inputAmount),
   ])
 
-  // Walk through each hop and append swap calls.
-  // `currentCoin` represents the coin flowing through the route.
-  // After each hop it becomes the output coin of that hop's swap call.
-  // In this scaffold we hold a reference to the last split/result coin.
-  // A full implementation threads the actual moveCall result objects.
-  let currentCoin = exactCoin
+  // 2. Deduct protocol fee from the input coin BEFORE routing through the DEX.
+  //    splitProtocolFee returns the remaining coin after fee removal.
+  const swapCoin = splitProtocolFee(txb, exactCoin, route.inputAmount, protocol, PACKAGE_ID)
+
+  // 3. Walk through each hop and append swap calls.
+  //    `currentCoin` represents the coin flowing through the route.
+  //    A full integration threads the actual moveCall result objects.
+  let currentCoin = swapCoin
 
   for (let i = 0; i < route.path.length; i++) {
     const step = route.path[i]
@@ -115,24 +119,14 @@ export function buildSingleSwapTx(
     const isLastHop = i === route.path.length - 1
     const minOut = isLastHop ? applySlippage(step.amountOut, slippageBps) : BigInt(0)
 
-    // Append the DEX-specific swap call.
-    // currentCoin is passed conceptually — real threading requires capturing
-    // the moveCall result. See note at top of file.
     adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb, step.tokenIn)
 
-    // After the last hop, `currentCoin` still holds the split coin reference.
-    // In a full integration you'd reassign `currentCoin` to the moveCall result.
-    void currentCoin // suppress unused-variable lint on non-final hops
+    // A full integration reassigns currentCoin to the moveCall result here
+    void currentCoin
   }
 
-  // Record volume with the protocol config if provided
-  if (protocol.configObjectId && protocol.treasuryObjectId) {
-    appendProtocolFeeCall(txb, protocol, route.outputAmount)
-  }
-
-  // Transfer the final output coin to the recipient.
-  // In a full integration this would be the result coin from the last hop.
-  txb.transferObjects([exactCoin], recipient)
+  // 4. Transfer the final output coin to the recipient.
+  txb.transferObjects([swapCoin], recipient)
 
   return txb
 }
@@ -161,30 +155,37 @@ export function buildSplitSwapTx(
 ): Transaction {
   const txb = new Transaction()
 
-  // 1. Collect per-portion input amounts (each route stores its own inputAmount)
-  const portionAmounts = splitRoute.routes.map(({ route }) => route.inputAmount)
+  // 1. Total input across all portions
+  const totalAmountIn = splitRoute.routes.reduce((sum, { route }) => sum + route.inputAmount, 0n)
 
-  // 2. Split the source coin into one piece per route portion
+  // 2. Deduct protocol fee from the TOTAL input first, then split the remainder
+  const [totalCoin] = txb.splitCoins(txb.object(coinIn), [txb.pure.u64(totalAmountIn)])
+  const swapCoin = splitProtocolFee(txb, totalCoin, totalAmountIn, protocol, PACKAGE_ID)
+
+  // 3. Compute post-fee portion amounts proportionally (maintain sum invariant)
+  const feeAmount = computeProtocolFee(totalAmountIn)
+  const postFeeTotal = totalAmountIn - feeAmount
+  const portionAmounts = splitRoute.routes.map(({ route }) =>
+    (route.inputAmount * postFeeTotal) / totalAmountIn
+  )
+
+  // 4. Split post-fee coin into per-route portions
   const splitAmountArgs = portionAmounts.map(amt => txb.pure.u64(amt))
-  const portionCoins = txb.splitCoins(txb.object(coinIn), splitAmountArgs)
+  const portionCoins = txb.splitCoins(swapCoin, splitAmountArgs)
 
-  // 3. Append a swap call for each portion and collect coin references
-  //    (In a full implementation each adapter call's result replaces the
-  //    portionCoin reference so the actual swapped coin flows into mergeCoins.)
+  // 5. Swap each portion and collect output coin references
   const outputCoinRefs: ReturnType<typeof txb.splitCoins>[number][] = []
 
   for (let i = 0; i < splitRoute.routes.length; i++) {
     const { route } = splitRoute.routes[i]
     if (route.path.length === 0) continue
 
-    const step: RouteStep = route.path[0] // split routes are single-hop
+    const step: RouteStep = route.path[0]
     const adapter = getAdapter(step.pool.dexId)
-
     const minOut = applySlippage(step.amountOut, slippageBps)
 
-    adapter.buildSwapTransaction(step.pool, step.amountIn, minOut, recipient, txb, step.tokenIn)
+    adapter.buildSwapTransaction(step.pool, portionAmounts[i], minOut, recipient, txb, step.tokenIn)
 
-    // Collect the portion coin reference; a real integration captures moveCall result
     const portionCoin = Array.isArray(portionCoins) ? portionCoins[i] : portionCoins
     outputCoinRefs.push(portionCoin)
   }
@@ -193,13 +194,9 @@ export function buildSplitSwapTx(
     throw new Error('[OmniWeave] buildSplitSwapTx: no valid split portions')
   }
 
-  // 4. Merge all portions into the first coin
+  // 6. Merge all output portions and transfer to recipient
   if (outputCoinRefs.length > 1) {
     txb.mergeCoins(outputCoinRefs[0], outputCoinRefs.slice(1))
-  }
-
-  if (protocol.configObjectId && protocol.treasuryObjectId) {
-    appendProtocolFeeCall(txb, protocol, splitRoute.totalOutput)
   }
 
   txb.transferObjects([outputCoinRefs[0]], recipient)
@@ -211,17 +208,90 @@ export function buildSplitSwapTx(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Append protocol fee / volume tracking call (no-op placeholder) */
-function appendProtocolFeeCall(
+/** OmniWeave protocol fee in basis points (5 bps = 0.05%) */
+export const OMNIWEAVE_FEE_BPS = 5n
+
+/**
+ * Compute the fee amount for a given input.
+ * fee = floor(amountIn * fee_bps / 10_000)
+ */
+export function computeProtocolFee(amountIn: bigint, feeBps: bigint = OMNIWEAVE_FEE_BPS): bigint {
+  return (amountIn * feeBps) / 10_000n
+}
+
+/**
+ * Compute the post-fee amount that reaches the DEX.
+ */
+export function amountAfterFee(amountIn: bigint, feeBps: bigint = OMNIWEAVE_FEE_BPS): bigint {
+  return amountIn - computeProtocolFee(amountIn, feeBps)
+}
+
+/**
+ * Append protocol fee collection to a PTB.
+ *
+ * Two modes:
+ *  1. Router deployed (configObjectId + treasuryObjectId set):
+ *     Calls omniweave_router::charge_fee<CoinIn>, which internally splits
+ *     the fee and deposits it into the Treasury shared object.
+ *
+ *  2. Router not deployed (objects are empty strings):
+ *     Falls back to a direct splitCoins + transferObjects to the fee recipient
+ *     address from NEXT_PUBLIC_ADMIN_ADDRESS env var (dev/testnet mode only).
+ *
+ * @param txb          - The transaction being built
+ * @param coinRef      - The input coin argument inside the PTB (before the swap)
+ * @param amountIn     - Raw input amount (base units)
+ * @param protocol     - Protocol object IDs
+ * @param packageId    - Deployed OmniWeave package ID (may be empty)
+ * @returns The remaining coin argument after the fee is taken (to send to the DEX)
+ */
+export function splitProtocolFee(
   txb: Transaction,
+  coinRef: ReturnType<typeof txb.splitCoins>[number],
+  amountIn: bigint,
   protocol: ProtocolObjects,
-  outputAmount: bigint
-): void {
-  // Placeholder: real implementation calls
-  // omniweave::router::record_swap(config, treasury, outputAmount)
-  void txb
-  void protocol
-  void outputAmount
+  packageId: string,
+): ReturnType<typeof txb.splitCoins>[number] {
+  const feeAmount = computeProtocolFee(amountIn)
+  if (feeAmount === 0n) return coinRef
+
+  const deployed =
+    packageId &&
+    packageId !== '0x0' &&
+    protocol.configObjectId &&
+    protocol.configObjectId !== '0x0' &&
+    protocol.treasuryObjectId &&
+    protocol.treasuryObjectId !== '0x0'
+
+  if (deployed) {
+    // On-chain path: call omniweave_router::charge_fee<CoinIn>
+    // The Move function splits feeAmount from coinRef and deposits it in Treasury.
+    txb.moveCall({
+      target: `${packageId}::omniweave_router::charge_fee`,
+      arguments: [
+        txb.object(protocol.configObjectId),
+        txb.object(protocol.treasuryObjectId),
+        coinRef,
+        txb.pure.u64(feeAmount),
+      ],
+    })
+    // coinRef now holds (amountIn - feeAmount) after the Move call mutates it
+    return coinRef
+  }
+
+  // Fallback path (contract not deployed): manual PTB fee split
+  const feeRecipient =
+    process.env.NEXT_PUBLIC_ADMIN_ADDRESS ||
+    '0x0000000000000000000000000000000000000000000000000000000000000000'
+
+  if (feeRecipient === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+    // No recipient configured — skip fee in dev mode
+    return coinRef
+  }
+
+  const [feeCoin, remainderCoin] = txb.splitCoins(coinRef, [txb.pure.u64(feeAmount)])
+  txb.transferObjects([feeCoin], feeRecipient)
+  return remainderCoin
 }
 
 /**

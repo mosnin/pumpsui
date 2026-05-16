@@ -20,7 +20,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getQuiClient } from '@/lib/suiClient'
 import { OmniWeaveAggregator } from '@/lib/routing/aggregator'
-import { applySlippage } from '@/lib/routing/transactionBuilder'
+import {
+  applySlippage,
+  computeProtocolFee,
+  amountAfterFee,
+  OMNIWEAVE_FEE_BPS,
+} from '@/lib/routing/transactionBuilder'
 import type { QuoteResult } from '@/lib/routing/types'
 
 // Cache duration for identical requests (ms)
@@ -69,14 +74,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const slippageBps = clamp(parseInt(slippageStr, 10), 0, 5_000)
 
   // -------------------------------------------------------------------------
-  // 2. Run the aggregator
+  // 2. Deduct OmniWeave protocol fee before routing
+  //    The DEX sees (amountIn - fee); the fee stays in the Treasury.
+  // -------------------------------------------------------------------------
+  const protocolFeeAmount = computeProtocolFee(amountIn)
+  const amountInAfterFee = amountAfterFee(amountIn)
+
+  // -------------------------------------------------------------------------
+  // 3. Run the aggregator on the post-fee amount
   // -------------------------------------------------------------------------
   let quote: QuoteResult
   try {
     const client = getQuiClient()
     const aggregator = new OmniWeaveAggregator(client)
 
-    quote = await aggregator.getQuote(tokenIn, tokenOut, amountIn, {
+    quote = await aggregator.getQuote(tokenIn, tokenOut, amountInAfterFee, {
       maxHops,
       maxSplits,
     })
@@ -86,7 +98,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // -------------------------------------------------------------------------
-  // 3. Compute minAmountOut with slippage
+  // 4. Compute minAmountOut with slippage applied to the post-fee output
   // -------------------------------------------------------------------------
   const minAmountOut =
     quote.outputAmount > 0n
@@ -94,12 +106,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       : 0n
 
   // -------------------------------------------------------------------------
-  // 4. Serialize & return
+  // 5. Serialize & return — include fee breakdown for the UI
   // -------------------------------------------------------------------------
   const body = {
     quote: serializeQuote(quote),
     minAmountOut: minAmountOut.toString(),
     slippageBps,
+    fee: {
+      bps: Number(OMNIWEAVE_FEE_BPS),
+      amountIn: protocolFeeAmount.toString(),
+      amountInAfterFee: amountInAfterFee.toString(),
+    },
     executedAt: new Date().toISOString(),
     params: {
       tokenIn,

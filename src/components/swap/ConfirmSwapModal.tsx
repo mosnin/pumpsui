@@ -125,7 +125,12 @@ export function ConfirmSwapModal({
   const isDangerImpact = priceImpact >= PRICE_IMPACT_DANGER_THRESHOLD
   const isWarnImpact = priceImpact >= 2 && !isDangerImpact
 
-  const omniWeaveFeeDisplay = `${(OMNIWEAVE_FEE_BPS / 100).toFixed(2)}%`
+  const feeTokenAmount = tokenIn
+    ? ((parseFloat(amountIn) * OMNIWEAVE_FEE_BPS) / 10_000).toFixed(tokenIn.decimals > 6 ? 6 : tokenIn.decimals)
+    : null
+  const omniWeaveFeeDisplay = feeTokenAmount
+    ? `${(OMNIWEAVE_FEE_BPS / 100).toFixed(2)}% (${feeTokenAmount} ${tokenIn?.symbol})`
+    : `${(OMNIWEAVE_FEE_BPS / 100).toFixed(2)}%`
   const slippageDisplay = `${(slippageBps / 100).toFixed(2)}%`
   const minimumReceived = route.route.minimumReceived
 
