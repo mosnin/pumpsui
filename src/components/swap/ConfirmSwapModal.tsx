@@ -1,11 +1,15 @@
 'use client'
 
+import { useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Transaction } from '@mysten/sui/transactions'
 import { Token } from '@/lib/tokens'
 import { SwapQuote } from '@/hooks/useSwap'
 import { useExecuteSwap } from '@/hooks/useExecuteSwap'
+import { useSimulation } from '@/hooks/useSimulation'
+import { useCurrentAccount } from '@mysten/dapp-kit'
 import { TxStatusBadge } from './TxStatusBadge'
+import { SimulationPreview } from './SimulationPreview'
 import { OMNIWEAVE_FEE_BPS, PRICE_IMPACT_DANGER_THRESHOLD } from '@/lib/constants'
 import { GradientSpinner } from '@/components/ui/Spinner'
 
@@ -114,6 +118,25 @@ export function ConfirmSwapModal({
   onSwapAgain,
 }: ConfirmSwapModalProps) {
   const { execute, status, txHash, error, reset } = useExecuteSwap()
+  const { simulate, result: simResult, loading: simLoading, error: simError, reset: simReset } = useSimulation()
+  const account = useCurrentAccount()
+
+  // Auto-simulate when the modal opens (idle state only)
+  useEffect(() => {
+    if (open && status === 'idle') {
+      try {
+        const tx = onBuildTx()
+        simulate(tx)
+      } catch {
+        // onBuildTx may throw if quote isn't ready; simulation just won't run
+      }
+    }
+    // Reset simulation when modal closes
+    if (!open) {
+      simReset()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const isIdle = status === 'idle'
   const isSigning = status === 'signing'
@@ -147,6 +170,7 @@ export function ConfirmSwapModal({
   const handleClose = () => {
     if (isLoading) return // prevent closing mid-tx
     reset()
+    simReset()
     onClose()
   }
 
@@ -293,6 +317,21 @@ export function ConfirmSwapModal({
                     </div>
                   )}
 
+                  {/* Simulation preview */}
+                  <SimulationPreview
+                    result={simResult}
+                    loading={simLoading}
+                    error={simError}
+                    userAddress={account?.address ?? ''}
+                    onSimulate={() => {
+                      try {
+                        simulate(onBuildTx())
+                      } catch {
+                        // ignore build errors
+                      }
+                    }}
+                  />
+
                   {/* Route breakdown */}
                   <div
                     className="rounded-xl px-4 py-1 mb-4"
@@ -380,27 +419,68 @@ export function ConfirmSwapModal({
                     </div>
                   </div>
 
+                  {/* Simulation failure warning — shown above CTA when sim failed */}
+                  {simResult && !simResult.success && isIdle && (
+                    <div
+                      className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-xs mb-3"
+                      style={{
+                        background: 'rgba(239,68,68,0.1)',
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        color: '#FCA5A5',
+                      }}
+                    >
+                      <svg className="flex-shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                      <span>
+                        Simulation shows this transaction would fail. Confirm is disabled.
+                      </span>
+                    </div>
+                  )}
+
                   {/* CTA Button */}
-                  <button
-                    onClick={isIdle ? handleConfirm : () => { reset() }}
-                    className="w-full py-4 rounded-2xl font-bold text-base relative overflow-hidden transition-all duration-200"
-                    style={{
-                      background: isError
-                        ? 'linear-gradient(135deg, #1e1e3a 0%, #12122a 100%)'
-                        : isDangerImpact
-                        ? 'linear-gradient(135deg, #DC2626, #EF4444)'
-                        : 'linear-gradient(135deg, #6366F1 0%, #4F46E5 40%, #06B6D4 100%)',
-                      color: isError ? '#94A3B8' : '#fff',
-                      border: isError ? '1px solid rgba(99,102,241,0.2)' : 'none',
-                      boxShadow: isError
-                        ? 'none'
-                        : isDangerImpact
-                        ? '0 4px 20px rgba(239,68,68,0.4)'
-                        : '0 4px 20px rgba(99,102,241,0.4), 0 0 40px rgba(6,182,212,0.15)',
-                    }}
-                  >
-                    {isError ? 'Try again' : isDangerImpact ? 'Swap anyway' : 'Confirm Swap'}
-                  </button>
+                  {(() => {
+                    const simFailed = !!simResult && !simResult.success
+                    const isDisabled = simFailed && isIdle
+                    return (
+                      <button
+                        onClick={isIdle && !isDisabled ? handleConfirm : () => { reset(); simReset() }}
+                        disabled={isDisabled}
+                        className="w-full py-4 rounded-2xl font-bold text-base relative overflow-hidden transition-all duration-200"
+                        style={{
+                          background: isDisabled
+                            ? 'rgba(255,255,255,0.04)'
+                            : isError
+                            ? 'linear-gradient(135deg, #1e1e3a 0%, #12122a 100%)'
+                            : isDangerImpact
+                            ? 'linear-gradient(135deg, #DC2626, #EF4444)'
+                            : 'linear-gradient(135deg, #6366F1 0%, #4F46E5 40%, #06B6D4 100%)',
+                          color: isDisabled ? '#475569' : isError ? '#94A3B8' : '#fff',
+                          border: isDisabled
+                            ? '1px solid rgba(239,68,68,0.2)'
+                            : isError
+                            ? '1px solid rgba(99,102,241,0.2)'
+                            : 'none',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          boxShadow: isDisabled || isError
+                            ? 'none'
+                            : isDangerImpact
+                            ? '0 4px 20px rgba(239,68,68,0.4)'
+                            : '0 4px 20px rgba(99,102,241,0.4), 0 0 40px rgba(6,182,212,0.15)',
+                        }}
+                      >
+                        {isDisabled
+                          ? 'Transaction would fail'
+                          : isError
+                          ? 'Try again'
+                          : isDangerImpact
+                          ? 'Swap anyway'
+                          : 'Confirm Swap'}
+                      </button>
+                    )
+                  })()}
                 </div>
               )}
 

@@ -16,12 +16,16 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Swap', href: '/swap' },
   { label: 'Limit', href: '/limit' },
+  { label: 'DCA', href: '/dca' },
   { label: 'Bridge', href: '/bridge' },
+  { label: 'Cross-Chain', href: '/cross-chain' },
   { label: 'Pools', href: '/pools' },
   { label: 'Analytics', href: '/analytics' },
   { label: 'Portfolio', href: '/portfolio' },
   { label: 'Leaderboard', href: '/leaderboard' },
   { label: 'Referral', href: '/referral' },
+  { label: 'Rewards', href: '/rewards' },
+  { label: 'Docs', href: '/docs' },
 ]
 
 // ─── OmniWeave SVG Logo ───────────────────────────────────────────────────────

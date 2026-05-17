@@ -623,6 +623,13 @@ export default function BridgeCard() {
           : `Bridge via ${selectedQuote.bridgeName}`}
       </button>
 
+      {/* Transaction simulation note */}
+      {/* NOTE: Transaction simulation (dryRunTransactionBlock) is available for
+          Sui-native swaps via SimulationPreview + useSimulation. Bridge transactions
+          originate on external EVM chains and are relayed by the bridge protocol,
+          so they cannot be dry-run against the Sui RPC before the source-chain tx
+          is submitted. Simulation is therefore intentionally omitted here. */}
+
       {/* Summary strip */}
       {selectedQuote && (
         <div

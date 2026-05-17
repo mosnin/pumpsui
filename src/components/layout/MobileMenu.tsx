@@ -14,12 +14,15 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Swap', href: '/swap' },
   { label: 'Limit', href: '/limit' },
+  { label: 'DCA', href: '/dca' },
   { label: 'Bridge', href: '/bridge' },
+  { label: 'Cross-Chain', href: '/cross-chain' },
   { label: 'Pools', href: '/pools' },
   { label: 'Analytics', href: '/analytics' },
   { label: 'Portfolio', href: '/portfolio' },
   { label: 'Leaderboard', href: '/leaderboard' },
   { label: 'Referral', href: '/referral' },
+  { label: 'Rewards', href: '/rewards' },
 ]
 
 interface MobileMenuProps {
@@ -203,9 +206,20 @@ function NavIcon({ label, active }: { label: string; active: boolean }) {
         <circle cx="16" cy="16" r="2" fill={color} stroke="none" />
       </svg>
     ),
+    DCA: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v4l3 3" />
+      </svg>
+    ),
     Bridge: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+      </svg>
+    ),
+    'Cross-Chain': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
       </svg>
     ),
     Pools: (
@@ -244,6 +258,11 @@ function NavIcon({ label, active }: { label: string; active: boolean }) {
         <path d="M14.5 21C14.5 18.52 15.57 16.5 17 16.5" />
         <path d="M14 9l2-2-2-2" />
         <path d="M12 7h4" />
+      </svg>
+    ),
+    Rewards: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>
     ),
   }
