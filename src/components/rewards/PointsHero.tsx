@@ -7,17 +7,17 @@ import { getTierForPoints, getNextTier, getTierProgress, TIERS } from '@/store/p
 // ─── Countdown timer ──────────────────────────────────────────────────────────
 
 function useCountdown(targetDate: Date) {
-  const calc = () => {
-    const diff = Math.max(0, targetDate.getTime() - Date.now())
+  const calcTime = (td: Date) => {
+    const diff = Math.max(0, td.getTime() - Date.now())
     const d = Math.floor(diff / 86_400_000)
     const h = Math.floor((diff % 86_400_000) / 3_600_000)
     const m = Math.floor((diff % 3_600_000) / 60_000)
     const s = Math.floor((diff % 60_000) / 1_000)
     return { d, h, m, s }
   }
-  const [time, setTime] = useState(calc)
+  const [time, setTime] = useState(() => calcTime(targetDate))
   useEffect(() => {
-    const id = setInterval(() => setTime(calc()), 1_000)
+    const id = setInterval(() => setTime(calcTime(targetDate)), 1_000)
     return () => clearInterval(id)
   }, [targetDate])
   return time
