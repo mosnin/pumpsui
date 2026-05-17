@@ -138,7 +138,6 @@ export function LiveSwapFeed({ swaps: externalSwaps, maxRows = 8, className = ''
   )
   const [newIds, setNewIds] = useState<Set<string>>(new Set())
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isDemo = externalSwaps === undefined
 
@@ -177,12 +176,8 @@ export function LiveSwapFeed({ swaps: externalSwaps, maxRows = 8, className = ''
   // Tick for relative time labels
   useRelativeTimes(isDemo ? demoSwaps : (externalSwaps ?? []))
 
-  // Cleanup interval on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [])
+  // intervalRef is used only as a stable container, not for scheduling.
+  // Cleanup is handled in the demo effect above via timeoutRef.
 
   const displayed = isDemo
     ? demoSwaps.slice(0, maxRows)
