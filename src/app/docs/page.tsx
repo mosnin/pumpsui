@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
+import type React from 'react'
 import { CodeBlock } from '@/components/docs/CodeBlock'
 import { TryItWidget } from '@/components/docs/TryItWidget'
 
 export const metadata: Metadata = {
   title: 'Developer API | OmniWeave',
   description:
-    'Integrate OmniWeave's DEX aggregation routing layer into your protocol. Real-time quotes, live token prices, pool data, and cross-DEX routing across Sui mainnet.',
+    "Integrate OmniWeave's DEX aggregation routing layer into your protocol. Real-time quotes, live token prices, pool data, and cross-DEX routing across Sui mainnet.",
 }
 
 // ---------------------------------------------------------------------------

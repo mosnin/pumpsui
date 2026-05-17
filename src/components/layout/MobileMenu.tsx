@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Leaderboard', href: '/leaderboard' },
   { label: 'Referral', href: '/referral' },
   { label: 'Rewards', href: '/rewards' },
+  { label: 'Docs', href: '/docs' },
 ]
 
 interface MobileMenuProps {
