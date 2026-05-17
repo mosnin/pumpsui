@@ -4,6 +4,7 @@ import './globals.css'
 import { AppProviders } from '@/providers/AppProviders'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import { InstallPrompt } from '@/components/common/InstallPrompt'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -41,6 +42,14 @@ export const metadata: Metadata = {
     follow: true,
   },
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'OmniWeave',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -54,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
+          <InstallPrompt />
         </AppProviders>
       </body>
     </html>

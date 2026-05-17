@@ -90,3 +90,57 @@ html, body {
 .animate-toast-in      { animation: toast-in      0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-toast-out     { animation: toast-out     0.2s ease-in forwards; }
 .animate-toast-swipe-out { animation: toast-swipe-out 0.2s ease-out forwards; }
+
+/* ─── Live price ticker ──────────────────────────────────────────────────── */
+
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Duplicate the content so the scroll is seamless */
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-scroll 40s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Flash green when price goes up, red when it goes down */
+@keyframes price-flash-up {
+  0%   { color: #34d399; }
+  100% { color: inherit; }
+}
+
+@keyframes price-flash-down {
+  0%   { color: #f87171; }
+  100% { color: inherit; }
+}
+
+.price-flash-up   { animation: price-flash-up   0.8s ease-out forwards; }
+.price-flash-down { animation: price-flash-down 0.8s ease-out forwards; }
+
+/* Live swap feed — slide-in from top */
+@keyframes swap-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.swap-row-enter { animation: swap-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* Connected pulse dot */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.animate-live-pulse { animation: live-pulse 1.5s ease-in-out infinite; }
