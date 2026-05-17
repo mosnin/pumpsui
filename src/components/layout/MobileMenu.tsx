@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics' },
   { label: 'Portfolio', href: '/portfolio' },
   { label: 'Leaderboard', href: '/leaderboard' },
+  { label: 'Social', href: '/social' },
   { label: 'Referral', href: '/referral' },
   { label: 'Rewards', href: '/rewards' },
   { label: 'Staking', href: '/staking' },
@@ -259,6 +260,13 @@ function NavIcon({ label, active }: { label: string; active: boolean }) {
         <path d="M16 6h3a1 1 0 011 1v10a1 1 0 01-1 1h-3" />
         <rect x="8" y="2" width="8" height="20" rx="1" />
         <path d="M12 6v4l2 2" />
+      </svg>
+    ),
+    Social: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
       </svg>
     ),
     Referral: (

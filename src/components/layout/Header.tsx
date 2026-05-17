@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics' },
   { label: 'Portfolio', href: '/portfolio' },
   { label: 'Leaderboard', href: '/leaderboard' },
+  { label: 'Social', href: '/social' },
   { label: 'Referral', href: '/referral' },
   { label: 'Rewards', href: '/rewards' },
   { label: 'Staking', href: '/staking' },
