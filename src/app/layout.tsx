@@ -5,6 +5,7 @@ import { AppProviders } from '@/providers/AppProviders'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { InstallPrompt } from '@/components/common/InstallPrompt'
+import { LivePriceTicker } from '@/components/common/LivePriceTicker'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-[#060611] text-slate-200 min-h-screen flex flex-col">
         <AppProviders>
           <Header />
+          <LivePriceTicker />
           <main className="flex-1">{children}</main>
           <Footer />
           <InstallPrompt />

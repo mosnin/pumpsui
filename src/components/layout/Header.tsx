@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Limit', href: '/limit' },
   { label: 'DCA', href: '/dca' },
   { label: 'Bridge', href: '/bridge' },
+  { label: 'Buy Crypto', href: '/onramp' },
   { label: 'Cross-Chain', href: '/cross-chain' },
   { label: 'Pools', href: '/pools' },
   { label: 'Analytics', href: '/analytics' },
