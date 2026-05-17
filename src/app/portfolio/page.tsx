@@ -19,6 +19,15 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { SUI_TOKENS } from '@/lib/tokens'
 import { useRecentSwaps } from '@/hooks/useSuiEvents'
 import { useTokenPrices } from '@/hooks/useTokenPrices'
+import {
+  generatePortfolioHistory,
+  generateTradeHistory,
+  computeStats,
+} from '@/lib/portfolio'
+import { PnLStats } from '@/components/portfolio/PnLStats'
+import { PortfolioChart } from '@/components/portfolio/PortfolioChart'
+import { AssetAllocation } from '@/components/portfolio/AssetAllocation'
+import { TradeHistory } from '@/components/portfolio/TradeHistory'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -204,6 +213,25 @@ export default function PortfolioPage() {
     () => (isMockData ? 0 : userSwaps.length),
     [isMockData, userSwaps],
   )
+
+  // ── Analytics / P&L data ──────────────────────────────────────────────────
+
+  const demoValue = totalValue > 0 ? totalValue : 5000
+
+  const portfolioHistory = useMemo(
+    () => generatePortfolioHistory(demoValue),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [demoValue],
+  )
+
+  const tradeHistory = useMemo(() => generateTradeHistory(), [])
+
+  const portfolioStats = useMemo(
+    () => computeStats(tradeHistory, demoValue, portfolioHistory),
+    [tradeHistory, demoValue, portfolioHistory],
+  )
+
+  const latestSnapshot = portfolioHistory[portfolioHistory.length - 1] ?? null
 
   // ── Refresh handler ───────────────────────────────────────────────────────
 
@@ -638,6 +666,20 @@ export default function PortfolioPage() {
                   </table>
                 </div>
               )}
+            </div>
+
+            {/* ── Analytics sections ───────────────────────────────────── */}
+
+            {/* P&L Stats row */}
+            <PnLStats stats={portfolioStats} />
+
+            {/* Portfolio value chart */}
+            <PortfolioChart history={portfolioHistory} />
+
+            {/* Two-column: Asset Allocation + Trade History */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <AssetAllocation latestSnapshot={latestSnapshot} />
+              <TradeHistory trades={tradeHistory} />
             </div>
 
           </div>

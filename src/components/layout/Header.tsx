@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { WalletButton } from '@/components/wallet/WalletButton'
 import { MobileMenu } from '@/components/layout/MobileMenu'
+import { AlertBell } from '@/components/alerts/AlertBell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Staking', href: '/staking' },
   { label: 'Governance', href: '/governance' },
   { label: 'Token', href: '/token' },
+  { label: 'Alerts', href: '/alerts' },
   { label: 'Docs', href: '/docs' },
 ]
 
@@ -215,9 +217,10 @@ export function Header() {
           {/* Center: desktop nav */}
           <DesktopNav />
 
-          {/* Right: network indicator + wallet */}
+          {/* Right: network indicator + alert bell + wallet */}
           <div className="flex items-center gap-3">
             <NetworkIndicator />
+            <AlertBell />
             <WalletButton />
           </div>
         </div>
