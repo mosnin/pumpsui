@@ -427,7 +427,7 @@ export default function DocsPage() {
             </span>
           </h1>
           <p className="text-lg text-slate-400 max-w-2xl mb-8">
-            Embed OmniWeave's routing engine in your protocol. Get best-price quotes, live
+            Embed OmniWeave&apos;s routing engine in your protocol. Get best-price quotes, live
             token prices, and pool data from all major Sui DEXes in a single REST call.
           </p>
 
