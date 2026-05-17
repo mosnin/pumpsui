@@ -15,6 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Swap', href: '/swap' },
   { label: 'Limit', href: '/limit' },
   { label: 'DCA', href: '/dca' },
+  { label: 'Advanced', href: '/advanced' },
   { label: 'Bridge', href: '/bridge' },
   { label: 'Buy Crypto', href: '/onramp' },
   { label: 'Cross-Chain', href: '/cross-chain' },
@@ -27,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Rewards', href: '/rewards' },
   { label: 'Staking', href: '/staking' },
   { label: 'Governance', href: '/governance' },
+  { label: 'NFTs', href: '/nft' },
   { label: 'Token', href: '/token' },
   { label: 'Alerts', href: '/alerts' },
   { label: 'Docs', href: '/docs' },
@@ -217,6 +219,11 @@ function NavIcon({ label, active }: { label: string; active: boolean }) {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 8v4l3 3" />
+      </svg>
+    ),
+    Advanced: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
       </svg>
     ),
     Bridge: (
