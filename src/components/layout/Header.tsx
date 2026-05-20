@@ -34,7 +34,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Governance', href: '/governance' },
   { label: 'NFTs', href: '/nft' },
   { label: 'Token', href: '/token' },
+  { label: 'Launch', href: '/launch' },
   { label: 'MEV Shield', href: '/mev' },
+  { label: 'Keepers', href: '/keepers' },
   { label: 'Alerts', href: '/alerts' },
   { label: 'Docs', href: '/docs' },
 ]

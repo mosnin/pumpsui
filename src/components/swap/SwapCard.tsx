@@ -382,6 +382,17 @@ export function SwapCard() {
         }
       />
 
+      {/* Private order flow modal */}
+      {privateOrder && swap.tokenIn && swap.tokenOut && (
+        <PrivateOrderModal
+          open={privateOrderOpen && showPrivateOrderFlow}
+          onClose={() => setPrivateOrderOpen(false)}
+          order={privateOrder}
+          tokenInSymbol={swap.tokenIn.symbol}
+          tokenOutSymbol={swap.tokenOut.symbol}
+        />
+      )}
+
       {/* Confirm swap modal — only mounted when we have the required data */}
       {swap.tokenIn && swap.tokenOut && swap.quote && (
         <ConfirmSwapModal
