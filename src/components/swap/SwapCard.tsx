@@ -28,6 +28,7 @@ export function SwapCard() {
   const [flipping, setFlipping] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [gaslessMode, setGaslessMode] = useState(true)
+  const [privateOrderOpen, setPrivateOrderOpen] = useState(false)
 
   const priceIn = useTokenPrice(swap.tokenIn?.coingeckoId)
   const priceOut = useTokenPrice(swap.tokenOut?.coingeckoId)
@@ -75,6 +76,42 @@ export function SwapCard() {
   const priceImpact = swap.quote?.priceImpact ?? 0
   const isHighImpact = priceImpact >= PRICE_IMPACT_WARNING_THRESHOLD
   const isDangerImpact = priceImpact >= PRICE_IMPACT_DANGER_THRESHOLD
+
+  // MEV risk analysis — only when we have a live quote and USD value
+  const mevRisk = useMemo(() => {
+    if (!swap.quote || !usdIn || usdIn <= 0) return null
+    return analyzeSandwichRisk({
+      tokenIn: swap.tokenIn?.address ?? '',
+      tokenOut: swap.tokenOut?.address ?? '',
+      amountUsd: usdIn,
+      // Assume pool liquidity ~500× trade size as a conservative floor; real data
+      // would come from the DEX pool response.
+      poolLiquidityUsd: Math.max(usdIn * 50, 100_000),
+      slippageBps: swap.settings.slippageBps,
+      priceImpactBps: Math.round(swap.quote.priceImpact * 100),
+    })
+  }, [swap.quote, usdIn, swap.tokenIn?.address, swap.tokenOut?.address, swap.settings.slippageBps])
+
+  const showPrivateOrderFlow =
+    swap.settings.mevProtection &&
+    usdIn !== null &&
+    usdIn >= PRIVATE_ORDER_THRESHOLD_USD
+
+  const privateOrder = useMemo(() => {
+    if (!swap.tokenIn || !swap.tokenOut || !swap.amountIn || !swap.quote || !account?.address) {
+      return null
+    }
+    const amountInRaw = BigInt(Math.round(parseFloat(swap.amountIn) * 10 ** (swap.tokenIn.decimals ?? 9)))
+    const minOut = BigInt(Math.round(parseFloat(swap.quote.amountOut) * 10 ** (swap.tokenOut.decimals ?? 9)))
+    return {
+      tokenIn: swap.tokenIn.address,
+      tokenOut: swap.tokenOut.address,
+      amountIn: amountInRaw,
+      minAmountOut: minOut,
+      deadline: Math.floor(Date.now() / 1000) + 300,
+      userAddress: account.address,
+    }
+  }, [swap.tokenIn, swap.tokenOut, swap.amountIn, swap.quote, account?.address])
 
   const canSwap =
     swap.tokenIn &&
@@ -254,6 +291,15 @@ export function SwapCard() {
               </svg>
               {swap.error}
             </div>
+          )}
+
+          {/* MEV protection badge — shown when MEV protection is on and we have a quote */}
+          {swap.settings.mevProtection && mevRisk && usdIn !== null && (
+            <MEVProtectionBadge
+              risk={mevRisk}
+              tradeAmountUsd={usdIn}
+              onSwitchToPrivate={() => setPrivateOrderOpen(true)}
+            />
           )}
 
           {/* Gasless badge */}
