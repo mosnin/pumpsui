@@ -15,6 +15,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { label: 'AI', href: '/ai' },
   { label: 'Swap', href: '/swap' },
   { label: 'Limit', href: '/limit' },
   { label: 'DCA', href: '/dca' },
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Governance', href: '/governance' },
   { label: 'NFTs', href: '/nft' },
   { label: 'Token', href: '/token' },
+  { label: 'MEV Shield', href: '/mev' },
   { label: 'Alerts', href: '/alerts' },
   { label: 'Docs', href: '/docs' },
 ]

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Transaction } from '@mysten/sui/transactions'
 import { useCurrentAccount, useSuiClientQuery } from '@mysten/dapp-kit'
 import { useSwap } from '@/hooks/useSwap'
@@ -8,11 +8,16 @@ import { useTokenPrice } from '@/hooks/useTokenPrices'
 import { Token } from '@/lib/tokens'
 import { PRICE_IMPACT_DANGER_THRESHOLD, PRICE_IMPACT_WARNING_THRESHOLD } from '@/lib/constants'
 import { buildAggregatedSwapTx } from '@/lib/routing/transactionBuilder'
+import { analyzeSandwichRisk, estimateSandwichProfit } from '@/lib/mev'
+import { PRIVATE_ORDER_THRESHOLD_USD } from '@/lib/privateOrderFlow'
 import TokenSelector from './TokenSelector'
 import TokenModal from './TokenModal'
 import RouteDisplay from './RouteDisplay'
 import SlippageSettings from './SlippageSettings'
 import { ConfirmSwapModal } from './ConfirmSwapModal'
+import GaslessBadge from './GaslessBadge'
+import { MEVProtectionBadge } from './MEVProtectionBadge'
+import { PrivateOrderModal } from './PrivateOrderModal'
 
 type ModalTarget = 'in' | 'out' | null
 
@@ -22,6 +27,7 @@ export function SwapCard() {
   const [modalTarget, setModalTarget] = useState<ModalTarget>(null)
   const [flipping, setFlipping] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [gaslessMode, setGaslessMode] = useState(true)
 
   const priceIn = useTokenPrice(swap.tokenIn?.coingeckoId)
   const priceOut = useTokenPrice(swap.tokenOut?.coingeckoId)
@@ -249,6 +255,11 @@ export function SwapCard() {
               {swap.error}
             </div>
           )}
+
+          {/* Gasless badge */}
+          <div className="mt-3">
+            <GaslessBadge gaslessMode={gaslessMode} onToggle={setGaslessMode} />
+          </div>
 
           {/* CTA Button */}
           <button

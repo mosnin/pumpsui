@@ -6,6 +6,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { InstallPrompt } from '@/components/common/InstallPrompt'
 import { LivePriceTicker } from '@/components/common/LivePriceTicker'
+import { AIChatButton } from '@/components/ai/AIChatButton'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1">{children}</main>
           <Footer />
           <InstallPrompt />
+          <AIChatButton />
         </AppProviders>
       </body>
     </html>
