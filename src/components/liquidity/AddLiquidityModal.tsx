@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { Token, SUI_TOKENS, findToken } from '@/lib/tokens'
 import TokenModal from '@/components/swap/TokenModal'
-import { AddLiquidityParams, PRICE_RANGE_PRESETS, buildAddLiquidityTx } from '@/lib/liquidity'
+import { AddLiquidityParams, PRICE_RANGE_PRESETS, buildAddLiquidityTx, computeLiquidityFee, LIQUIDITY_FEE_BPS } from '@/lib/liquidity'
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit'
 
 interface AddLiquidityModalProps {
@@ -110,12 +111,18 @@ export default function AddLiquidityModal({
 
     const { tickLower, tickUpper } = getTicksForPreset()
 
+    const rawAmount0 = BigInt(Math.floor(parsed0 * Math.pow(10, token0.decimals)))
+    const rawAmount1 = BigInt(Math.floor(parsed1 * Math.pow(10, token1.decimals)))
+
+    const fee0 = computeLiquidityFee(rawAmount0)
+    const fee1 = computeLiquidityFee(rawAmount1)
+
     const params: AddLiquidityParams = {
       poolId: initialPoolId ?? '0xdemo_pool',
       token0: token0.symbol,
       token1: token1.symbol,
-      amount0: BigInt(Math.floor(parsed0 * Math.pow(10, token0.decimals))),
-      amount1: BigInt(Math.floor(parsed1 * Math.pow(10, token1.decimals))),
+      amount0: rawAmount0 - fee0,
+      amount1: rawAmount1 - fee1,
       tickLower,
       tickUpper,
       slippageBps: 50,
@@ -439,6 +446,38 @@ export default function AddLiquidityModal({
                 </div>
               </div>
             </div>
+
+            {/* Platform fee disclosure */}
+            {(amount0 || amount1) && (
+              <div
+                className="flex flex-col gap-1 px-3 py-2.5 rounded-xl text-xs"
+                style={{
+                  background: 'rgba(99,102,241,0.06)',
+                  border: '1px solid rgba(99,102,241,0.15)',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span style={{ color: '#64748B' }}>Platform fee</span>
+                  <span style={{ color: '#818CF8' }}>{Number(LIQUIDITY_FEE_BPS) / 100}% on deposit amounts</span>
+                </div>
+                {amount0 && !isNaN(parseFloat(amount0)) && token0 && (
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: '#475569' }}>Fee {token0.symbol}</span>
+                    <span style={{ color: '#94A3B8' }}>
+                      {(parseFloat(amount0) * Number(LIQUIDITY_FEE_BPS) / 10_000).toFixed(4)} {token0.symbol}
+                    </span>
+                  </div>
+                )}
+                {amount1 && !isNaN(parseFloat(amount1)) && token1 && (
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: '#475569' }}>Fee {token1.symbol}</span>
+                    <span style={{ color: '#94A3B8' }}>
+                      {(parseFloat(amount1) * Number(LIQUIDITY_FEE_BPS) / 10_000).toFixed(4)} {token1.symbol}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Not connected warning */}
             {!account && (

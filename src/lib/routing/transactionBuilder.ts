@@ -282,12 +282,7 @@ export function splitProtocolFee(
   // Fallback path (contract not deployed): manual PTB fee split
   const feeRecipient =
     process.env.NEXT_PUBLIC_ADMIN_ADDRESS ||
-    '0x0000000000000000000000000000000000000000000000000000000000000000'
-
-  if (feeRecipient === '0x0000000000000000000000000000000000000000000000000000000000000000') {
-    // No recipient configured — skip fee in dev mode
-    return coinRef
-  }
+    '0x0000000000000000000000000000000000000000000000000000000000000001' // Sui foundation zero addr as placeholder
 
   const [feeCoin, remainderCoin] = txb.splitCoins(coinRef, [txb.pure.u64(feeAmount)])
   txb.transferObjects([feeCoin], feeRecipient)

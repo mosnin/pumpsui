@@ -14,6 +14,7 @@ import {
 } from '@/lib/chartData'
 import SwapWidget from '@/components/swap/SwapWidget'
 import { PriceHeader } from '@/components/charts/PriceHeader'
+import { PageTransition } from '@/components/layout/PageTransition'
 
 const CandlestickChart = dynamic(
   () => import('@/components/charts/CandlestickChart').then(m => ({ default: m.CandlestickChart })),
@@ -82,6 +83,7 @@ export default function TokenDetailPage({ params }: { params: Promise<TokenDetai
   const recentTxs = generateRecentTxs(symbolUpper, stats.price)
 
   return (
+    <PageTransition>
     <div className="min-h-screen" style={{ background: '#060611', color: '#E2E8F0' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
@@ -261,5 +263,6 @@ export default function TokenDetailPage({ params }: { params: Promise<TokenDetai
         </div>
       </div>
     </div>
+    </PageTransition>
   )
 }

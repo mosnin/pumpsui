@@ -205,6 +205,7 @@ export default function SwapPage() {
           </div>
         </div>
       </div>
+      </PageTransition>
 
       {/* Blob keyframes */}
       <style>{`

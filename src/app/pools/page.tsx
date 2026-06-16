@@ -15,6 +15,7 @@ import { DEXBadge, type DEXName } from '@/components/common/DEXBadge'
 import { PriceChange } from '@/components/common/PriceChange'
 import PositionCard from '@/components/liquidity/PositionCard'
 import { generateDemoPositions, LPPosition } from '@/lib/liquidity'
+import { PageTransition } from '@/components/layout/PageTransition'
 
 const AddLiquidityModal = dynamic(() => import('@/components/liquidity/AddLiquidityModal'), { ssr: false })
 const RemoveLiquidityModal = dynamic(() => import('@/components/liquidity/RemoveLiquidityModal'), { ssr: false })
@@ -123,6 +124,7 @@ export default function PoolsPage() {
   }
 
   return (
+    <PageTransition>
     <div
       className="min-h-screen font-sans"
       style={{ background: '#060611', color: '#E2E8F0' }}
@@ -464,5 +466,6 @@ export default function PoolsPage() {
         position={removePosition}
       />
     </div>
+    </PageTransition>
   )
 }

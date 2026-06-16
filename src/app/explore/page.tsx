@@ -35,6 +35,7 @@ export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<Tab>('tokens')
 
   return (
+    <PageTransition>
     <div
       className="min-h-screen font-sans"
       style={{ background: '#060611', color: '#E2E8F0' }}
@@ -109,5 +110,6 @@ export default function ExplorePage() {
         </div>
       </div>
     </div>
+    </PageTransition>
   )
 }

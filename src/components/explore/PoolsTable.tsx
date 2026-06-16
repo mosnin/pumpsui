@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { type PoolRow } from '@/lib/explore'
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
@@ -125,8 +126,8 @@ export function PoolsTable({ rows }: Props) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row) => (
-            <tr
+          {sorted.map((row, index) => (
+            <motion.tr
               key={row.id}
               className="group transition-colors"
               style={{
@@ -135,6 +136,9 @@ export function PoolsTable({ rows }: Props) {
               }}
               onMouseEnter={() => setHoveredId(row.id)}
               onMouseLeave={() => setHoveredId(null)}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.03, duration: 0.2 }}
             >
               {/* Pool pair + DEX badge */}
               <td className="px-4 py-3">
@@ -208,7 +212,7 @@ export function PoolsTable({ rows }: Props) {
                   Add Liquidity
                 </Link>
               </td>
-            </tr>
+            </motion.tr>
           ))}
         </tbody>
       </table>

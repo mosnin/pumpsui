@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { Transaction } from '@mysten/sui/transactions'
 import { useCurrentAccount, useSuiClientQuery } from '@mysten/dapp-kit'
 import { useSwap } from '@/hooks/useSwap'
@@ -8,7 +9,7 @@ import { useTokenPrice } from '@/hooks/useTokenPrices'
 import { Token } from '@/lib/tokens'
 import { PRICE_IMPACT_DANGER_THRESHOLD, PRICE_IMPACT_WARNING_THRESHOLD } from '@/lib/constants'
 import { buildAggregatedSwapTx } from '@/lib/routing/transactionBuilder'
-import { analyzeSandwichRisk, estimateSandwichProfit } from '@/lib/mev'
+import { analyzeSandwichRisk } from '@/lib/mev'
 import { PRIVATE_ORDER_THRESHOLD_USD } from '@/lib/privateOrderFlow'
 import TokenSelector from './TokenSelector'
 import TokenModal from './TokenModal'
@@ -38,9 +39,12 @@ export function SwapCard() {
     { owner: account?.address ?? '', coinType: swap.tokenIn?.address ?? '0x2::sui::SUI' },
     { enabled: !!account && !!swap.tokenIn }
   )
-  const maxBalance = balanceData
-    ? Number(balanceData.totalBalance) / 10 ** (swap.tokenIn?.decimals ?? 9)
-    : 0
+  // maxBalance is 0 when connected but no tokens; undefined means wallet not connected
+  const maxBalance = account
+    ? (balanceData
+        ? Number(balanceData.totalBalance) / 10 ** (swap.tokenIn?.decimals ?? 9)
+        : 0)
+    : undefined
 
   const usdIn =
     priceIn !== null && swap.amountIn && parseFloat(swap.amountIn) > 0
@@ -68,7 +72,7 @@ export function SwapCard() {
   )
 
   const handleMax = useCallback(() => {
-    if (maxBalance > 0) {
+    if (maxBalance !== undefined && maxBalance > 0) {
       swap.setAmountIn(maxBalance.toString())
     }
   }, [swap, maxBalance])
@@ -139,12 +143,16 @@ export function SwapCard() {
   return (
     <>
       {/* Gradient border wrapper */}
-      <div
+      <motion.div
         className="w-full max-w-md mx-auto rounded-3xl p-px"
         style={{
           background:
             'linear-gradient(135deg, rgba(99,102,241,0.5) 0%, rgba(6,182,212,0.4) 50%, rgba(99,102,241,0.3) 100%)',
         }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+        whileHover={{ scale: 1.002 }}
       >
         <div
           className="rounded-[calc(1.5rem-1px)] p-5"
@@ -186,16 +194,18 @@ export function SwapCard() {
           </div>
 
           {/* Token In */}
-          <TokenSelector
-            token={swap.tokenIn}
-            amount={swap.amountIn}
-            onAmountChange={swap.setAmountIn}
-            onTokenClick={() => setModalTarget('in')}
-            usdValue={usdIn}
-            balance={account ? maxBalance.toFixed(4) : undefined}
-            onMax={handleMax}
-            label="You pay"
-          />
+          <motion.div layout>
+            <TokenSelector
+              token={swap.tokenIn}
+              amount={swap.amountIn}
+              onAmountChange={swap.setAmountIn}
+              onTokenClick={() => setModalTarget('in')}
+              usdValue={usdIn}
+              balance={account ? (maxBalance !== undefined ? maxBalance.toFixed(4) : '0.0000') : '—'}
+              onMax={handleMax}
+              label="You pay"
+            />
+          </motion.div>
 
           {/* Flip button */}
           <div className="flex items-center justify-center my-2 relative">
@@ -203,24 +213,24 @@ export function SwapCard() {
               className="absolute inset-x-0 h-px"
               style={{ background: 'rgba(99,102,241,0.1)' }}
             />
-            <button
+            <motion.button
               onClick={handleFlip}
               className="relative z-10 w-11 h-11 rounded-xl flex items-center justify-center"
               style={{
                 background: 'linear-gradient(135deg, #1e1e3a 0%, #12122a 100%)',
                 border: '1px solid rgba(99,102,241,0.3)',
                 color: '#6366F1',
-                transform: flipping ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 300ms ease, box-shadow 150ms',
                 boxShadow: '0 2px 12px rgba(99,102,241,0.2)',
               }}
+              animate={{ rotate: flipping ? 180 : 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(99,102,241,0.4)'
-                e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)'
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px rgba(99,102,241,0.4)'
+                ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.6)'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 2px 12px rgba(99,102,241,0.2)'
-                e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 12px rgba(99,102,241,0.2)'
+                ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.3)'
               }}
               title="Flip tokens"
             >
@@ -230,20 +240,22 @@ export function SwapCard() {
               >
                 <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
               </svg>
-            </button>
+            </motion.button>
           </div>
 
           {/* Token Out */}
-          <TokenSelector
-            token={swap.tokenOut}
-            amount={swap.amountOut}
-            onAmountChange={swap.setAmountOut}
-            onTokenClick={() => setModalTarget('out')}
-            usdValue={usdOut}
-            balance="52.34"
-            label="You receive"
-            loading={swap.loading}
-          />
+          <motion.div layout>
+            <TokenSelector
+              token={swap.tokenOut}
+              amount={swap.amountOut}
+              onAmountChange={swap.setAmountOut}
+              onTokenClick={() => setModalTarget('out')}
+              usdValue={usdOut}
+              balance={undefined}
+              label="You receive"
+              loading={swap.loading}
+            />
+          </motion.div>
 
           {/* Price impact warning */}
           {isHighImpact && swap.quote && (
@@ -359,7 +371,7 @@ export function SwapCard() {
             )}
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Route display below the card */}
       {swap.quote && swap.tokenIn && swap.tokenOut && (

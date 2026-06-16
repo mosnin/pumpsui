@@ -1,5 +1,20 @@
 import { Transaction } from '@mysten/sui/transactions'
 
+// ---------------------------------------------------------------------------
+// Platform liquidity fee
+// ---------------------------------------------------------------------------
+
+/** OmniWeave platform fee on liquidity deposits: 10 bps = 0.1% */
+export const LIQUIDITY_FEE_BPS = 10n // 0.1%
+
+/**
+ * Compute the platform fee for a liquidity deposit amount.
+ * fee = floor(amount * LIQUIDITY_FEE_BPS / 10_000)
+ */
+export function computeLiquidityFee(amount: bigint): bigint {
+  return (amount * LIQUIDITY_FEE_BPS) / 10_000n
+}
+
 // Cetus CLMM add liquidity params
 export interface AddLiquidityParams {
   poolId: string

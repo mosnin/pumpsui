@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { type TokenRow } from '@/lib/explore'
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
@@ -191,8 +192,8 @@ export function TokensTable({ rows }: Props) {
             </tr>
           </thead>
           <tbody>
-            {visible.map((row) => (
-              <tr
+            {visible.map((row, index) => (
+              <motion.tr
                 key={row.symbol}
                 className="group transition-colors"
                 style={{
@@ -201,6 +202,9 @@ export function TokensTable({ rows }: Props) {
                 }}
                 onMouseEnter={() => setHoveredRow(row.rank)}
                 onMouseLeave={() => setHoveredRow(null)}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.03, duration: 0.2 }}
               >
                 {/* Rank */}
                 <td className="px-4 py-3 text-slate-500 text-xs font-mono">{row.rank}</td>
@@ -272,7 +276,7 @@ export function TokensTable({ rows }: Props) {
                     Swap
                   </Link>
                 </td>
-              </tr>
+              </motion.tr>
             ))}
           </tbody>
         </table>
