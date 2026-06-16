@@ -522,7 +522,7 @@ export default function PortfolioPage() {
                             <td className="px-5 py-4 text-right font-semibold font-mono" style={{ color: '#E2E8F0' }}>
                               {value > 0 ? fmt(value) : <span className="text-slate-600">—</span>}
                             </td>
-                          </motion.tr>
+                          </tr>
                         )
                       })}
                     </tbody>
@@ -597,11 +597,8 @@ export default function PortfolioPage() {
                         const inAmt = swap.amountIn / 10 ** inDec
                         const outAmt = swap.amountOut / 10 ** outDec
                         return (
-                          <motion.tr
+                          <tr
                             key={swap.digest}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.2, delay: index * 0.03 }}
                             className="hover:bg-white/[0.025] transition-colors"
                             style={{
                               borderBottom:
@@ -663,7 +660,7 @@ export default function PortfolioPage() {
                                 </span>
                               )}
                             </td>
-                          </motion.tr>
+                          </tr>
                         )
                       })}
                     </tbody>
