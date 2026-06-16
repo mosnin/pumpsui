@@ -16,6 +16,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'AI', href: '/ai' },
+  { label: 'Explore', href: '/explore' },
   { label: 'Swap', href: '/swap' },
   { label: 'Limit', href: '/limit' },
   { label: 'DCA', href: '/dca' },
@@ -38,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'MEV Shield', href: '/mev' },
   { label: 'Keepers', href: '/keepers' },
   { label: 'Alerts', href: '/alerts' },
+  { label: 'Deploy', href: '/deploy' },
   { label: 'Docs', href: '/docs' },
 ]
 
