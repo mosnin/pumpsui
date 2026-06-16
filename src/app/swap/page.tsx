@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import SwapCard from '@/components/swap/SwapCard'
 import { PriceChart } from '@/components/swap/PriceChart'
 import { useSwap } from '@/hooks/useSwap'
+import { PageTransition } from '@/components/layout/PageTransition'
 
 // ─── Swap / Limit tab nav ─────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ export default function SwapPage() {
       </div>
 
       {/* Content */}
+      <PageTransition>
       <div className="relative z-10 w-full flex flex-col items-center gap-6">
         {/* Logo / brand */}
         <div className="flex flex-col items-center gap-2 mb-2">

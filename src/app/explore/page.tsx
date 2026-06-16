@@ -11,6 +11,7 @@ import {
   generatePoolRows,
   generateTransactions,
 } from '@/lib/explore'
+import { PageTransition } from '@/components/layout/PageTransition'
 
 // ─── Static data (generated once at module level, stable across renders) ───────
 
