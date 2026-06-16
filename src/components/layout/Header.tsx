@@ -17,33 +17,14 @@ interface NavItem {
   href: string
 }
 
+// Primary nav — fully built pages only
 const NAV_ITEMS: NavItem[] = [
-  { label: 'AI', href: '/ai' },
-  { label: 'Explore', href: '/explore' },
   { label: 'Swap', href: '/swap' },
-  { label: 'Limit', href: '/limit' },
-  { label: 'DCA', href: '/dca' },
-  { label: 'Advanced', href: '/advanced' },
-  { label: 'Bridge', href: '/bridge' },
-  { label: 'Buy Crypto', href: '/onramp' },
-  { label: 'Cross-Chain', href: '/cross-chain' },
+  { label: 'Explore', href: '/explore' },
   { label: 'Pools', href: '/pools' },
   { label: 'Analytics', href: '/analytics' },
+  { label: 'Bridge', href: '/bridge' },
   { label: 'Portfolio', href: '/portfolio' },
-  { label: 'Leaderboard', href: '/leaderboard' },
-  { label: 'Social', href: '/social' },
-  { label: 'Referral', href: '/referral' },
-  { label: 'Rewards', href: '/rewards' },
-  { label: 'Staking', href: '/staking' },
-  { label: 'Governance', href: '/governance' },
-  { label: 'NFTs', href: '/nft' },
-  { label: 'Token', href: '/token' },
-  { label: 'Launch', href: '/launch' },
-  { label: 'MEV Shield', href: '/mev' },
-  { label: 'Keepers', href: '/keepers' },
-  { label: 'Alerts', href: '/alerts' },
-  { label: 'Deploy', href: '/deploy' },
-  { label: 'Docs', href: '/docs' },
 ]
 
 // ─── OmniWeave SVG Logo ───────────────────────────────────────────────────────

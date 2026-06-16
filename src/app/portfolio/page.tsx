@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useCallback, useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   Wallet,
   TrendingUp,
@@ -423,7 +424,7 @@ export default function PortfolioPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm min-w-[600px]">
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
                         {['Token', 'Balance', 'Price', 'Value'].map((h) => (
@@ -439,7 +440,7 @@ export default function PortfolioPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tokenBalances.map((token, i) => {
+                      {tokenBalances.map((token, index) => {
                         const value = token.amount * token.price
                         const pct = totalValue > 0 ? (value / totalValue) * 100 : 0
                         const color = tokenIconColor(token.symbol)
@@ -449,7 +450,7 @@ export default function PortfolioPage() {
                             className="hover:bg-white/[0.025] transition-colors"
                             style={{
                               borderBottom:
-                                i < tokenBalances.length - 1
+                                index < tokenBalances.length - 1
                                   ? '1px solid rgba(99,102,241,0.07)'
                                   : 'none',
                             }}
@@ -521,7 +522,7 @@ export default function PortfolioPage() {
                             <td className="px-5 py-4 text-right font-semibold font-mono" style={{ color: '#E2E8F0' }}>
                               {value > 0 ? fmt(value) : <span className="text-slate-600">—</span>}
                             </td>
-                          </tr>
+                          </motion.tr>
                         )
                       })}
                     </tbody>
@@ -572,7 +573,7 @@ export default function PortfolioPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm min-w-[600px]">
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
                         {['Swap', 'Amount In', 'Amount Out', 'Time', 'Status', ''].map((h, i) => (
@@ -588,7 +589,7 @@ export default function PortfolioPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {userSwaps.map((swap, i) => {
+                      {userSwaps.map((swap, index) => {
                         const inSymbol = tokenSymbol(swap.coinInType)
                         const outSymbol = tokenSymbol(swap.coinOutType)
                         const inDec = tokenDecimals(swap.coinInType)
@@ -596,12 +597,15 @@ export default function PortfolioPage() {
                         const inAmt = swap.amountIn / 10 ** inDec
                         const outAmt = swap.amountOut / 10 ** outDec
                         return (
-                          <tr
+                          <motion.tr
                             key={swap.digest}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.2, delay: index * 0.03 }}
                             className="hover:bg-white/[0.025] transition-colors"
                             style={{
                               borderBottom:
-                                i < userSwaps.length - 1
+                                index < userSwaps.length - 1
                                   ? '1px solid rgba(99,102,241,0.07)'
                                   : 'none',
                             }}
@@ -659,7 +663,7 @@ export default function PortfolioPage() {
                                 </span>
                               )}
                             </td>
-                          </tr>
+                          </motion.tr>
                         )
                       })}
                     </tbody>

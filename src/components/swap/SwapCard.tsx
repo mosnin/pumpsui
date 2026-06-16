@@ -129,15 +129,15 @@ export function SwapCard() {
   const ctaLabel = swap.swapping
     ? 'Swapping…'
     : swap.loading
-    ? 'Fetching quote…'
+    ? 'Finding best rate…'
     : !swap.tokenIn || !swap.tokenOut
     ? 'Select tokens'
     : !swap.amountIn || parseFloat(swap.amountIn) <= 0
-    ? 'Enter an amount'
+    ? 'Enter amount to get a quote'
     : swap.error
     ? 'Retry'
     : isDangerImpact
-    ? 'Swap anyway'
+    ? 'Price impact is high — are you sure?'
     : 'Swap'
 
   return (
@@ -280,8 +280,8 @@ export function SwapCard() {
               </svg>
               <span>
                 {isDangerImpact
-                  ? `High price impact of ${priceImpact.toFixed(2)}%. You may lose a significant portion of your funds.`
-                  : `Price impact of ${priceImpact.toFixed(2)}%. Consider trading a smaller amount.`}
+                  ? `Price impact is high (${priceImpact.toFixed(2)}%) — are you sure? You may lose a significant portion of your funds.`
+                  : `Price impact of ${priceImpact.toFixed(2)}% — consider trading a smaller amount.`}
               </span>
             </div>
           )}

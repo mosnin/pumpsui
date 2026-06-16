@@ -296,7 +296,7 @@ export default function PoolsPage() {
               }}
             >
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[700px]">
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
                       <th className="text-left px-5 py-4 text-xs font-medium uppercase tracking-wider text-slate-500">

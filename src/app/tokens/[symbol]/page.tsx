@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { motion } from 'framer-motion'
 import { ArrowLeft, Star, ExternalLink, BarChart2 } from 'lucide-react'
 import { findToken, SUI_TOKENS } from '@/lib/tokens'
 import {
@@ -220,8 +221,11 @@ export default function TokenDetailPage({ params }: { params: Promise<TokenDetai
                   </thead>
                   <tbody>
                     {recentTxs.map((tx, i) => (
-                      <tr
+                      <motion.tr
                         key={tx.txId}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.18, delay: i * 0.04 }}
                         className="hover:bg-white/[0.02] transition-colors"
                         style={{ borderBottom: i < recentTxs.length - 1 ? '1px solid rgba(99,102,241,0.07)' : 'none' }}
                       >
@@ -244,7 +248,7 @@ export default function TokenDetailPage({ params }: { params: Promise<TokenDetai
                             {tx.account}
                           </a>
                         </td>
-                      </tr>
+                      </motion.tr>
                     ))}
                   </tbody>
                 </table>
