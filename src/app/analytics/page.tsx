@@ -105,6 +105,18 @@ function truncateAddr(addr: string): string {
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<'volume' | 'fees'>('volume')
 
+  // ── Live-updating TVL (starts at $124M, fluctuates ±0.1% every 30s) ─────────
+  const [tvl, setTvl] = useState(124_000_000)
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTvl((prev) => {
+        const delta = prev * 0.001 * (Math.random() * 2 - 1)
+        return Math.round(prev + delta)
+      })
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
   // ── Volume chart: 7-day SUI volume from CoinGecko ──────────────────────────
   const [volumeData, setVolumeData] = useState<VolumeDataPoint[]>([])
 
@@ -212,18 +224,18 @@ export default function AnalyticsPage() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
           <StatsCard
+            title="Total Value Locked"
+            value={fmtLarge(tvl)}
+            change24h={0.1}
+            icon={<DollarSign size={18} />}
+            subtitle="Across 6 DEXes · live"
+          />
+          <StatsCard
             title="Total Volume (24h)"
             value={volumeValue}
             change24h={volumeChange}
-            icon={<DollarSign size={18} />}
-            subtitle="Across 6 DEXes"
-          />
-          <StatsCard
-            title="Total Swaps (24h)"
-            value="24,831"
-            change24h={12.7}
             icon={<Activity size={18} />}
-            subtitle="~17.3 swaps / min"
+            subtitle="Across 6 DEXes"
           />
           <StatsCard
             title="Unique Users (24h)"

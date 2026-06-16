@@ -1,5 +1,6 @@
 'use client'
 
+import { motion } from 'framer-motion'
 import { TrendingUp, Minus, Plus, DollarSign } from 'lucide-react'
 import { DEXBadge } from '@/components/common/DEXBadge'
 import { LPPosition } from '@/lib/liquidity'
@@ -49,13 +50,17 @@ export default function PositionCard({ position, onAddMore, onRemove, onCollectF
     v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
 
   return (
-    <div
+    <motion.div
       className="rounded-2xl p-5 flex flex-col gap-4"
       style={{
         background: 'rgba(13,13,31,0.8)',
         border: '1px solid rgba(99,102,241,0.2)',
         backdropFilter: 'blur(12px)',
       }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      whileHover={{ scale: 1.01, borderColor: 'rgba(99,102,241,0.4)' }}
     >
       {/* Top row */}
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -194,6 +199,6 @@ export default function PositionCard({ position, onAddMore, onRemove, onCollectF
 
       {/* Hidden references to avoid unused var warnings */}
       <span className="hidden">{feesEarned0}{feesEarned1}</span>
-    </div>
+    </motion.div>
   )
 }

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { ArrowUpDown, Settings2 } from 'lucide-react'
 import { findToken, SUI_TOKENS, type Token } from '@/lib/tokens'
 import { useCurrentAccount } from '@mysten/dapp-kit'
+import { OMNIWEAVE_FEE_BPS } from '@/lib/routing/transactionBuilder'
 
 interface Props {
   defaultTokenIn?: string
@@ -80,13 +82,16 @@ export default function SwapWidget({ defaultTokenIn = 'USDC', defaultTokenOut = 
   const swapUrl = `/swap?tokenIn=${tokenIn.address}&tokenOut=${tokenOut.address}${amountIn ? `&amount=${amountIn}` : ''}`
 
   return (
-    <div
+    <motion.div
       className="rounded-2xl p-5"
       style={{
         background: 'linear-gradient(135deg, #0f0f23 0%, #0a0a1a 100%)',
         border: '1px solid rgba(99,102,241,0.3)',
         boxShadow: '0 0 40px rgba(99,102,241,0.1)',
       }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -174,21 +179,29 @@ export default function SwapWidget({ defaultTokenIn = 'USDC', defaultTokenOut = 
         </div>
       </div>
 
-      {/* Quote details */}
-      {quote && (
-        <div className="mb-4 flex flex-col gap-1.5">
-          {[
-            { label: 'Price impact', value: `${quote.priceImpact.toFixed(2)}%`, color: quote.priceImpact > 1 ? '#EF4444' : '#64748B' },
-            { label: 'Route',        value: quote.route,                         color: '#64748B' },
-            { label: 'Protocol fee', value: `${quote.feeBps / 100}%`,           color: '#64748B' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="flex items-center justify-between text-xs">
-              <span style={{ color: '#475569' }}>{label}</span>
-              <span style={{ color }}>{value}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Quote details with AnimatePresence fade in/out */}
+      <AnimatePresence>
+        {quote && (
+          <motion.div
+            className="mb-4 flex flex-col gap-1.5"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+          >
+            {[
+              { label: 'Price impact', value: `${quote.priceImpact.toFixed(2)}%`, color: quote.priceImpact > 1 ? '#EF4444' : '#64748B' },
+              { label: 'Route',        value: quote.route,                         color: '#64748B' },
+              { label: 'Protocol fee', value: `${Number(OMNIWEAVE_FEE_BPS) / 100}%`, color: '#64748B' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="flex items-center justify-between text-xs">
+                <span style={{ color: '#475569' }}>{label}</span>
+                <span style={{ color }}>{value}</span>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Action button */}
       {account ? (
@@ -215,6 +228,6 @@ export default function SwapWidget({ defaultTokenIn = 'USDC', defaultTokenOut = 
           OmniWeave aggregator
         </Link>
       </p>
-    </div>
+    </motion.div>
   )
 }

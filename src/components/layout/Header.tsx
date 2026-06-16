@@ -2,10 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { usePathname } from 'next/navigation'
 import { WalletButton } from '@/components/wallet/WalletButton'
 import { MobileMenu } from '@/components/layout/MobileMenu'
 import { AlertBell } from '@/components/alerts/AlertBell'
+
+const MotionLink = motion(Link)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,26 +176,31 @@ function DesktopNav() {
       {NAV_ITEMS.map(({ label, href }) => {
         const active = pathname === href
         return (
-          <Link
+          <MotionLink
             key={href}
             href={href}
             className={[
-              'relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200',
+              'relative px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200',
               active
                 ? 'text-indigo-300'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
             ].join(' ')}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.15 }}
           >
             {label}
 
-            {/* Active indicator bar */}
+            {/* Active indicator bar with shared layoutId for smooth transitions */}
             {active && (
-              <span
+              <motion.span
+                layoutId="nav-indicator"
                 className="absolute bottom-0 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full"
                 style={{ background: 'linear-gradient(90deg, #6366F1, #06B6D4)' }}
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
               />
             )}
-          </Link>
+          </MotionLink>
         )
       })}
     </nav>

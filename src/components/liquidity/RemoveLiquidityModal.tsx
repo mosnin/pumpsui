@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { LPPosition, buildRemoveLiquidityTx } from '@/lib/liquidity'
 import { DEXBadge } from '@/components/common/DEXBadge'
@@ -65,12 +66,15 @@ export default function RemoveLiquidityModal({ open, onClose, position }: Remove
     v.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
 
   return (
-    <div
+    <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
     >
-      <div
+      <motion.div
         className="relative w-full max-w-md rounded-2xl flex flex-col"
         style={{
           background: 'linear-gradient(135deg, #0f0f23 0%, #0a0a1a 100%)',
@@ -79,6 +83,9 @@ export default function RemoveLiquidityModal({ open, onClose, position }: Remove
           maxHeight: '90vh',
           overflowY: 'auto',
         }}
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
       >
         {/* Header */}
         <div
@@ -280,7 +287,7 @@ export default function RemoveLiquidityModal({ open, onClose, position }: Remove
             {isSubmitting ? 'Removing…' : `Remove ${percentage}% Liquidity`}
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
