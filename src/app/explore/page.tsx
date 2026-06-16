@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Compass } from 'lucide-react'
 import { TokensTable } from '@/components/explore/TokensTable'
 import { PoolsTable } from '@/components/explore/PoolsTable'
@@ -33,6 +33,14 @@ const TABS: { key: Tab; label: string }[] = [
 
 export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<Tab>('tokens')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Simulate initial data load — data is generated synchronously but we
+    // show skeletons for one tick so the loading state is visible.
+    const id = setTimeout(() => setLoading(false), 800)
+    return () => clearTimeout(id)
+  }, [])
 
   return (
     <PageTransition>
@@ -103,9 +111,9 @@ export default function ExplorePage() {
 
           {/* Tab content */}
           <div>
-            {activeTab === 'tokens'       && <TokensTable rows={TOKEN_ROWS} />}
-            {activeTab === 'pools'        && <PoolsTable rows={POOL_ROWS} />}
-            {activeTab === 'transactions' && <TransactionsTable initialRows={TRANSACTIONS} />}
+            {activeTab === 'tokens'       && <TokensTable rows={TOKEN_ROWS} loading={loading} />}
+            {activeTab === 'pools'        && <PoolsTable rows={POOL_ROWS} loading={loading} />}
+            {activeTab === 'transactions' && <TransactionsTable initialRows={TRANSACTIONS} loading={loading} />}
           </div>
         </div>
       </div>

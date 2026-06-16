@@ -3,7 +3,26 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { TrendingUp } from 'lucide-react'
 import { type TokenRow } from '@/lib/explore'
+import { EmptyState } from '@/components/ui/EmptyState'
+
+// ─── Skeleton row ─────────────────────────────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <tr>
+      {[...Array(6)].map((_, i) => (
+        <td key={i} className="px-4 py-3">
+          <div
+            className="h-4 rounded-lg animate-pulse"
+            style={{ background: 'rgba(99,102,241,0.1)', width: i === 0 ? '120px' : '80px' }}
+          />
+        </td>
+      ))}
+    </tr>
+  )
+}
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
 
@@ -106,9 +125,10 @@ const COLUMNS: Column[] = [
 
 interface Props {
   rows: TokenRow[]
+  loading?: boolean
 }
 
-export function TokensTable({ rows }: Props) {
+export function TokensTable({ rows, loading = false }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('rank')
   const [sortAsc, setSortAsc] = useState(true)
   const [page, setPage] = useState(10)
@@ -192,7 +212,19 @@ export function TokensTable({ rows }: Props) {
             </tr>
           </thead>
           <tbody>
-            {visible.map((row, index) => (
+            {loading && [...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+            {!loading && visible.length === 0 && (
+              <tr>
+                <td colSpan={11}>
+                  <EmptyState
+                    icon={<TrendingUp size={24} style={{ color: '#6366F1' }} />}
+                    title="No tokens found"
+                    description="Try adjusting your search or check back later as new tokens are listed."
+                  />
+                </td>
+              </tr>
+            )}
+            {!loading && visible.map((row, index) => (
               <motion.tr
                 key={row.symbol}
                 className="group transition-colors"

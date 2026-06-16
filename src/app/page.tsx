@@ -10,6 +10,8 @@ import {
   useSpring,
   useTransform,
 } from 'framer-motion'
+import { LiquidityFlowGraph } from '@/components/landing/LiquidityFlowGraph'
+import { DexPartners } from '@/components/landing/DexPartners'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -1117,6 +1119,25 @@ export default function Home() {
       <HeroSection />
       <MarqueeStrip />
       <HowItWorksSection />
+
+      {/* Liquidity Flow Graph */}
+      <section className="w-full max-w-4xl mx-auto px-4 py-16">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl font-black mb-3" style={{
+            background: 'linear-gradient(135deg, #818CF8, #06B6D4)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>
+            One Router. Every Liquidity Source.
+          </h2>
+          <p className="text-sm max-w-md mx-auto" style={{ color: '#64748B' }}>
+            OmniWeave splits and routes your order across all six major Sui DEXes simultaneously &mdash; finding the best price every time.
+          </p>
+        </div>
+        <LiquidityFlowGraph />
+        <DexPartners />
+      </section>
+
       <FeaturesSection />
       <ProtocolStatsSection />
       <WhySection />

@@ -6,6 +6,7 @@ import {
   ArrowDown, Clock, Shield, Zap, ChevronDown, ArrowLeftRight, Info,
   History, Flame, Star, TrendingUp,
 } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { CHAIN_IDS, SUPPORTED_CHAINS, BRIDGE_TOKENS } from '@/lib/bridges/types'
 import type { BridgeQuote } from '@/lib/bridges/types'
 import { getAllBridgeQuotes, formatEstimatedTime, formatBridgeFee } from '@/lib/bridges'
@@ -611,6 +612,17 @@ export default function BridgePage() {
                   transactions={recentTxs}
                   onDismiss={(id) => setRecentTxs((prev) => prev.filter((t) => t.id !== id))}
                   activeOnly={false}
+                />
+              </div>
+            )}
+
+            {/* Empty state for bridge transactions */}
+            {txsHydrated && recentTxs.length === 0 && (
+              <div className="glass-card">
+                <EmptyState
+                  icon={<ArrowLeftRight size={24} style={{ color: '#6366F1' }} />}
+                  title="No bridge transactions"
+                  description="Your cross-chain transfers will appear here once you initiate a bridge."
                 />
               </div>
             )}

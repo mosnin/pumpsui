@@ -1,7 +1,26 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { ArrowLeftRight } from 'lucide-react'
 import { generateTransactions, type Transaction } from '@/lib/explore'
+import { EmptyState } from '@/components/ui/EmptyState'
+
+// ─── Skeleton row ─────────────────────────────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <tr>
+      {[...Array(6)].map((_, i) => (
+        <td key={i} className="px-4 py-3">
+          <div
+            className="h-4 rounded-lg animate-pulse"
+            style={{ background: 'rgba(99,102,241,0.1)', width: i === 0 ? '120px' : '80px' }}
+          />
+        </td>
+      ))}
+    </tr>
+  )
+}
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
 
@@ -77,9 +96,10 @@ function nextTx(): Transaction {
 
 interface Props {
   initialRows: Transaction[]
+  loading?: boolean
 }
 
-export function TransactionsTable({ initialRows }: Props) {
+export function TransactionsTable({ initialRows, loading = false }: Props) {
   const [rows, setRows] = useState<Transaction[]>(initialRows)
 
   const addNewTx = useCallback(() => {
@@ -128,7 +148,19 @@ export function TransactionsTable({ initialRows }: Props) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((tx, idx) => (
+            {loading && [...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+            {!loading && rows.length === 0 && (
+              <tr>
+                <td colSpan={6}>
+                  <EmptyState
+                    icon={<ArrowLeftRight size={24} style={{ color: '#6366F1' }} />}
+                    title="No transactions yet"
+                    description="Recent swaps across all integrated DEXes will appear here in real-time."
+                  />
+                </td>
+              </tr>
+            )}
+            {!loading && rows.map((tx, idx) => (
               <tr
                 key={`${tx.hash}-${idx}`}
                 className="transition-colors hover:bg-white/[0.02]"

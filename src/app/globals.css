@@ -144,3 +144,10 @@ html, body {
 }
 
 .animate-live-pulse { animation: live-pulse 1.5s ease-in-out infinite; }
+
+/* Keyboard focus rings */
+:focus-visible {
+  outline: 2px solid #6366F1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

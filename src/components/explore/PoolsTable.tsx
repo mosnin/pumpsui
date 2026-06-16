@@ -3,7 +3,26 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { Layers } from 'lucide-react'
 import { type PoolRow } from '@/lib/explore'
+import { EmptyState } from '@/components/ui/EmptyState'
+
+// ─── Skeleton row ─────────────────────────────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <tr>
+      {[...Array(6)].map((_, i) => (
+        <td key={i} className="px-4 py-3">
+          <div
+            className="h-4 rounded-lg animate-pulse"
+            style={{ background: 'rgba(99,102,241,0.1)', width: i === 0 ? '120px' : '80px' }}
+          />
+        </td>
+      ))}
+    </tr>
+  )
+}
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
 
@@ -60,9 +79,10 @@ const COLUMNS: Column[] = [
 
 interface Props {
   rows: PoolRow[]
+  loading?: boolean
 }
 
-export function PoolsTable({ rows }: Props) {
+export function PoolsTable({ rows, loading = false }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('tvl')
   const [sortAsc, setSortAsc] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -126,7 +146,19 @@ export function PoolsTable({ rows }: Props) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row, index) => (
+          {loading && [...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+          {!loading && sorted.length === 0 && (
+            <tr>
+              <td colSpan={7}>
+                <EmptyState
+                  icon={<Layers size={24} style={{ color: '#06B6D4' }} />}
+                  title="No pools found"
+                  description="Liquidity pools will appear here once they are indexed from on-chain data."
+                />
+              </td>
+            </tr>
+          )}
+          {!loading && sorted.map((row, index) => (
             <motion.tr
               key={row.id}
               className="group transition-colors"
